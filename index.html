@@ -306,7 +306,15 @@ function getFiltered() {
   const FIELD_ORDER  = ['일자리','주거','교육ㆍ직업훈련','금융ㆍ복지ㆍ문화','참여권리'];
   const sort = document.getElementById('sort-select').value;
   // 모집상태순은 항상 1차 정렬 기준
-  const byStatus = (a,b) => (STATUS_ORDER[a.모집상태]??3) - (STATUS_ORDER[b.모집상태]??3);
+  // 경기도 광역 먼저, 그 다음 모집상태순
+  const byStatus = (a,b) => {
+    const sd = (STATUS_ORDER[a.모집상태]??3) - (STATUS_ORDER[b.모집상태]??3);
+    if (sd !== 0) return sd;
+    // 같은 상태 내에서 경기도 광역 우선
+    if (a.시군==='경기도' && b.시군!=='경기도') return -1;
+    if (b.시군==='경기도' && a.시군!=='경기도') return 1;
+    return 0;
+  };
   if (sort === 'status') {
     items = [...items].sort(byStatus);
   } else if (sort === 'city') {
