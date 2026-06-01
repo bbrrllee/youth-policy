@@ -1,9 +1,14 @@
 """
-온통청년 API → data.json 자동 갱신 + 확인필요 항목 공고 자동 검색
+온통청년 API + 경기도 전용 포털 자동 갱신
+- 온통청년 API (중앙·광역 정책)
+- 경기청년포털 youth.gg.go.kr (경기도 청년정책)
+- 잡아바 apply.jobaba.net (경기도일자리재단 - 청년기본소득 등)
+- 경기복지포털 gg24.gg.go.kr (고립은둔 등 복지사업)
 매일 GitHub Actions에서 실행됩니다.
 """
 import os, json, requests, xml.etree.ElementTree as ET, math, re
 from datetime import datetime
+from bs4 import BeautifulSoup
 
 API_KEY  = os.environ.get("API_KEY", "c937731f-99f2-489c-a334-07bbfff0da0d")
 BASE_URL = "https://www.youthcenter.go.kr/opi/youthPlcyList.do"
@@ -176,25 +181,39 @@ def main():
 
     print(f"\nAPI 자동 확인: {confirmed_count}개 모집중 확인")
 
-    # 온통청년 API 전체 수집 (신규 정책 추가)
+    # 온통청년 API 전체 수집
     print("\n온통청년 API 전체 수집...")
     first = fetch_api_page(1)
     if first is not None:
         total = int(first.findtext(".//totalCount", "0") or 0)
         api_items = [parse_item(i) for i in first.findall(".//youthPolicy")]
-
         for page in range(2, math.ceil(total / 100) + 1):
             root = fetch_api_page(page)
             if root:
                 api_items.extend([parse_item(i) for i in root.findall(".//youthPolicy")])
-
-        # 기존에 없는 신규 정책만 추가
         existing_names = {d.get("사업명", "") for d in updated}
         new_items = [i for i in api_items if i["사업명"] not in existing_names]
         for item in new_items:
             item["모집상태"] = get_status(item["모집시기"])
         updated.extend(new_items)
-        print(f"신규 정책 추가: {len(new_items)}개")
+        print(f"온통청년 API 신규: {len(new_items)}개")
+
+    # 경기도 전용 포털 크롤링 (청년기본소득, 고립은둔 등)
+    print("\n경기도 전용 포털 크롤링...")
+    existing_names = {d.get("사업명", "") for d in updated}
+
+    portal_items = []
+    portal_items.extend(scrape_jobaba())       # 잡아바 (청년기본소득 등)
+    portal_items.extend(scrape_gg24())         # 경기복지포털 (고립은둔 등)
+    portal_items.extend(scrape_gyeonggi_youth_portal())  # 경기청년포털
+
+    added = 0
+    for item in portal_items:
+        if item["사업명"] not in existing_names and len(item["사업명"]) > 2:
+            updated.append(item)
+            existing_names.add(item["사업명"])
+            added += 1
+    print(f"경기도 포털 신규 추가: {added}개")
 
     # 최종 저장
     with open("data.json", "w", encoding="utf-8") as f:
@@ -206,6 +225,147 @@ def main():
     print(f"\n✅ 완료: 총 {len(updated)}개")
     for k, v in sorted(status_count.items()):
         print(f"  {k}: {v}개")
+
+# ── 경기도 전용 포털 크롤링 ─────────────────────────────────
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+def scrape_gyeonggi_youth_portal():
+    """경기청년포털 youth.gg.go.kr - 청년기본소득, 갭이어, 사다리 등"""
+    results = []
+    # 경기청년포털 정책 목록
+    urls = [
+        "https://youth.gg.go.kr/gg/intro/youth-policy-list.do",
+        "https://youth.gg.go.kr/gg/archive-policy-search.do?mode=list&srSido=gyeonggi",
+    ]
+    for url in urls:
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=15)
+            soup = BeautifulSoup(r.text, "html.parser")
+            # 정책 카드/리스트 항목 파싱 (사이트 구조에 따라 조정)
+            items = soup.select(".policy-item, .list-item, article, .card")
+            for item in items:
+                title_el = item.select_one("h3, h4, .title, .tit, strong")
+                link_el  = item.select_one("a")
+                if title_el and title_el.get_text(strip=True):
+                    name = title_el.get_text(strip=True)
+                    link = ""
+                    if link_el and link_el.get("href"):
+                        href = link_el["href"]
+                        link = href if href.startswith("http") else f"https://youth.gg.go.kr{href}"
+                    results.append({
+                        "시군": "경기도", "분야": "금융ㆍ복지ㆍ문화",
+                        "사업명": name, "주요내용": "", "모집시기": "",
+                        "모집상태": "확인필요", "신청방법": "", "운영기관": "경기도",
+                        "문의처": "", "링크": link, "링크_모집": link, "링크_전년도": "",
+                        "출처": "경기청년포털", "갱신일": TODAY.strftime("%Y-%m-%d"),
+                    })
+        except Exception as e:
+            print(f"  경기청년포털 스크랩 오류: {e}")
+    return results
+
+def scrape_jobaba():
+    """잡아바 apply.jobaba.net - 청년기본소득, 각종 경기도 사업"""
+    results = []
+    # 잡아바 경기도 사업 목록
+    TARGET_PROGRAMS = [
+        {"name": "경기도 청년기본소득", "url": "https://apply.jobaba.net/special/gibon/main.do",
+         "분야": "금융ㆍ복지ㆍ문화", "모집상태": "모집중"},
+    ]
+    try:
+        r = requests.get("https://apply.jobaba.net/bsns/bsnsListView.do", headers=HEADERS, timeout=15)
+        soup = BeautifulSoup(r.text, "html.parser")
+        # 모집중 사업 파싱
+        items = soup.select(".bsns-item, .list-bsns li, .program-item")
+        for item in items:
+            title_el = item.select_one(".bsns-nm, .tit, h3, strong")
+            status_el = item.select_one(".status, .badge, .state")
+            link_el   = item.select_one("a")
+            if not title_el: continue
+            name = title_el.get_text(strip=True)
+            if not name: continue
+            status_text = status_el.get_text(strip=True) if status_el else ""
+            link = ""
+            if link_el and link_el.get("href"):
+                href = link_el["href"]
+                link = href if href.startswith("http") else f"https://apply.jobaba.net{href}"
+            status = "모집중" if "모집" in status_text else "모집예정" if "예정" in status_text else "확인필요"
+            results.append({
+                "시군": "경기도", "분야": "일자리",
+                "사업명": name, "주요내용": "", "모집시기": "",
+                "모집상태": status, "신청방법": "잡아바 온라인 신청",
+                "운영기관": "경기도일자리재단", "문의처": "",
+                "링크": link, "링크_모집": link, "링크_전년도": "",
+                "출처": "잡아바", "갱신일": TODAY.strftime("%Y-%m-%d"),
+            })
+        # 고정 프로그램 추가 (잡아바 파싱 실패 대비)
+        for p in TARGET_PROGRAMS:
+            if not any(r["사업명"] == p["name"] for r in results):
+                results.append({
+                    "시군": "경기도", "분야": p["분야"], "사업명": p["name"],
+                    "주요내용": "", "모집시기": "", "모집상태": p["모집상태"],
+                    "신청방법": "잡아바 온라인 신청", "운영기관": "경기도일자리재단",
+                    "문의처": "1877-0566", "링크": p["url"], "링크_모집": p["url"],
+                    "링크_전년도": "", "출처": "잡아바", "갱신일": TODAY.strftime("%Y-%m-%d"),
+                })
+    except Exception as e:
+        print(f"  잡아바 스크랩 오류: {e}")
+        # 오류 시 고정 프로그램만 추가
+        for p in TARGET_PROGRAMS:
+            results.append({
+                "시군": "경기도", "분야": p["분야"], "사업명": p["name"],
+                "주요내용": "", "모집시기": "", "모집상태": p["모집상태"],
+                "신청방법": "잡아바 온라인 신청", "운영기관": "경기도일자리재단",
+                "문의처": "1877-0566", "링크": p["url"], "링크_모집": p["url"],
+                "링크_전년도": "", "출처": "잡아바", "갱신일": TODAY.strftime("%Y-%m-%d"),
+            })
+    return results
+
+def scrape_gg24():
+    """경기복지포털 gg24.gg.go.kr - 고립은둔청년 등 복지사업"""
+    results = []
+    FIXED_PROGRAMS = [
+        {"name": "경기 고립은둔청년 지원사업",
+         "url": "https://gg24.gg.go.kr/svcreqst/selectSvcReqst.do?sch_tab_code=10&svc_seq=945",
+         "분야": "금융ㆍ복지ㆍ문화", "모집상태": "모집중",
+         "문의처": "경기복지재단 031-267-9100"},
+    ]
+    try:
+        url = "https://gg24.gg.go.kr/svcreqst/selectSvcReqstList.do?sch_tab_code=10"
+        r = requests.get(url, headers=HEADERS, timeout=15)
+        soup = BeautifulSoup(r.text, "html.parser")
+        items = soup.select("li.item, .svc-item, .list-item")
+        for item in items:
+            title_el = item.select_one(".svc-nm, .tit, h3, strong, a")
+            if not title_el: continue
+            name = title_el.get_text(strip=True)
+            if not name or "청년" not in name: continue
+            link_el = item.select_one("a")
+            link = ""
+            if link_el and link_el.get("href"):
+                href = link_el["href"]
+                link = href if href.startswith("http") else f"https://gg24.gg.go.kr{href}"
+            results.append({
+                "시군": "경기도", "분야": "금융ㆍ복지ㆍ문화", "사업명": name,
+                "주요내용": "", "모집시기": "", "모집상태": "확인필요",
+                "신청방법": "경기복지포털 온라인 신청", "운영기관": "경기복지재단",
+                "문의처": "031-267-9100", "링크": link, "링크_모집": link, "링크_전년도": "",
+                "출처": "경기복지포털", "갱신일": TODAY.strftime("%Y-%m-%d"),
+            })
+    except Exception as e:
+        print(f"  경기복지포털 스크랩 오류: {e}")
+
+    # 고정 프로그램 추가
+    for p in FIXED_PROGRAMS:
+        if not any(r["사업명"] == p["name"] for r in results):
+            results.append({
+                "시군": "경기도", "분야": p["분야"], "사업명": p["name"],
+                "주요내용": "", "모집시기": "", "모집상태": p["모집상태"],
+                "신청방법": "경기복지포털 온라인 신청", "운영기관": "경기복지재단",
+                "문의처": p["문의처"], "링크": p["url"], "링크_모집": p["url"], "링크_전년도": "",
+                "출처": "경기복지포털", "갱신일": TODAY.strftime("%Y-%m-%d"),
+            })
+    return results
+
 
 if __name__ == "__main__":
     main()

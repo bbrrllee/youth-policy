@@ -190,10 +190,11 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
   </div>
   <div class="filter-row">
     <span class="filter-label">상태</span>
-    <div class="chip status-check active" data-status="확인필요" onclick="toggleStatus('확인필요',this)">🔴 확인필요</div>
-    <div class="chip status-ing active" data-status="모집중" onclick="toggleStatus('모집중',this)">🟢 모집중</div>
-    <div class="chip status-soon active" data-status="모집예정" onclick="toggleStatus('모집예정',this)">🟡 모집예정</div>
-    <div class="chip status-unknown active" data-status="미정" onclick="toggleStatus('미정',this)">⚪ 미정</div>
+    <div class="chip active" id="chip-all-status" onclick="setAllStatus(this)">전체</div>
+    <div class="chip status-check" data-status="확인필요" onclick="toggleStatus('확인필요',this)">🔴 확인필요</div>
+    <div class="chip status-ing" data-status="모집중" onclick="toggleStatus('모집중',this)">🟢 모집중</div>
+    <div class="chip status-soon" data-status="모집예정" onclick="toggleStatus('모집예정',this)">🟡 모집예정</div>
+    <div class="chip status-unknown" data-status="미정" onclick="toggleStatus('미정',this)">⚪ 미정</div>
     <div class="chip status-done" data-status="마감" onclick="toggleStatus('마감',this)">⚫ 마감</div>
   </div>
   <div class="filter-row">
@@ -253,7 +254,8 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
 
 <script>
 let DATA = [];
-let state = { statuses: new Set(['확인필요','모집중','모집예정','미정']), city: 'all', field: 'all', query: '' };
+const ALL_STATUSES = ['확인필요','모집중','모집예정','미정','마감'];
+let state = { statuses: new Set(ALL_STATUSES), city: 'all', field: 'all', query: '', allStatus: true };
 let currentItem = null;
 
 fetch('data.json')
@@ -399,11 +401,36 @@ function openLink()     { const l=currentItem?.링크_모집||currentItem?.링�
 function openPrevLink() { if(currentItem?.링크_전년도) window.open(currentItem.링크_전년도,'_blank'); }
 function openSearch()   { if(currentItem) window.open(`https://www.google.com/search?q=${encodeURIComponent(currentItem.사업명+' 2026 모집 공고')}`,'_blank'); }
 
+function setAllStatus(el) {
+  state.allStatus = true;
+  state.statuses = new Set(ALL_STATUSES);
+  document.querySelectorAll('[data-status]').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
 function toggleStatus(status, el) {
-  if (state.statuses.has(status)) {
+  // '전체' 버튼 비활성화
+  document.getElementById('chip-all-status').classList.remove('active');
+  state.allStatus = false;
+
+  if (state.statuses.size === ALL_STATUSES.length) {
+    // 전체 선택 상태에서 하나 누르면 → 그것만 선택
+    state.statuses = new Set([status]);
+    document.querySelectorAll('[data-status]').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  } else if (state.statuses.has(status)) {
     if (state.statuses.size === 1) return;
     state.statuses.delete(status); el.classList.remove('active');
-  } else { state.statuses.add(status); el.classList.add('active'); }
+  } else {
+    state.statuses.add(status); el.classList.add('active');
+    // 전부 선택되면 '전체' 복귀
+    if (state.statuses.size === ALL_STATUSES.length) {
+      state.allStatus = true;
+      document.querySelectorAll('[data-status]').forEach(c => c.classList.remove('active'));
+      document.getElementById('chip-all-status').classList.add('active');
+    }
+  }
   render();
 }
 function setCity(city, el) {
