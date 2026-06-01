@@ -302,19 +302,24 @@ function getFiltered() {
       (d.시군||'').toLowerCase().includes(q)
     );
   }
-  const STATUS_ORDER = {'확인필요':0,'모집중':1,'모집예정':2,'미정':3,'마감':4};
+  const STATUS_ORDER = {'모집중':0,'확인필요':1,'모집예정':2,'미정':3,'마감':4};
   const FIELD_ORDER  = ['일자리','주거','교육ㆍ직업훈련','금융ㆍ복지ㆍ문화','참여권리'];
   const sort = document.getElementById('sort-select').value;
+  // 모집상태순은 항상 1차 정렬 기준
+  const byStatus = (a,b) => (STATUS_ORDER[a.모집상태]??3) - (STATUS_ORDER[b.모집상태]??3);
   if (sort === 'status') {
-    items = [...items].sort((a,b) => (STATUS_ORDER[a.모집상태]??2)-(STATUS_ORDER[b.모집상태]??2));
+    items = [...items].sort(byStatus);
   } else if (sort === 'city') {
     items = [...items].sort((a,b) => {
       if (a.시군==='경기도' && b.시군!=='경기도') return -1;
       if (b.시군==='경기도' && a.시군!=='경기도') return 1;
-      return a.시군.localeCompare(b.시군,'ko') || (STATUS_ORDER[a.모집상태]??2)-(STATUS_ORDER[b.모집상태]??2);
+      return a.시군.localeCompare(b.시군,'ko') || byStatus(a,b);
     });
   } else {
-    items = [...items].sort((a,b) => FIELD_ORDER.indexOf(a.분야)-FIELD_ORDER.indexOf(b.분야));
+    // 분야순 → 같은 분야 내에서는 모집상태순
+    items = [...items].sort((a,b) =>
+      (FIELD_ORDER.indexOf(a.분야) - FIELD_ORDER.indexOf(b.분야)) || byStatus(a,b)
+    );
   }
   return items;
 }
