@@ -33,6 +33,73 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
 .hc-dot.soon { background: #FCD34D; }
 .hc-dot.unknown { background: #A5B4FC; }
 
+/* ── 헤더 버튼 ── */
+.header-btns { display: flex; gap: 8px; }
+.header-btn {
+  padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  font-family: inherit; cursor: pointer; border: none; transition: opacity .15s; white-space: nowrap;
+}
+.header-btn:hover { opacity: .85; }
+.header-btn-contact { background: rgba(255,255,255,.15); color: #fff; border: 1.5px solid rgba(255,255,255,.4); }
+.header-btn-report  { background: #fff; color: var(--accent); }
+
+/* ── 팝업 공통 ── */
+.popup-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.45); z-index: 600;
+  align-items: center; justify-content: center; padding: 20px;
+}
+.popup-overlay.open { display: flex; }
+.popup-box {
+  background: #fff; border-radius: 16px; width: 100%; max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25); overflow: hidden;
+}
+.popup-header {
+  background: var(--accent); color: #fff;
+  padding: 18px 20px; display: flex; align-items: center; justify-content: space-between;
+}
+.popup-header-title { font-size: 15px; font-weight: 700; }
+.popup-close-btn {
+  width: 28px; height: 28px; border: none; background: rgba(255,255,255,.2);
+  border-radius: 50%; color: #fff; font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.popup-body { padding: 24px 20px; display: flex; flex-direction: column; gap: 14px; }
+
+/* 담당자 컨택 */
+.contact-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; background: var(--bg); border-radius: 10px;
+}
+.contact-icon { font-size: 20px; flex-shrink: 0; }
+.contact-label { font-size: 11px; color: var(--text3); margin-bottom: 3px; }
+.contact-value { font-size: 14px; font-weight: 600; color: var(--text); }
+.contact-value a { color: var(--accent); text-decoration: none; }
+.contact-value a:hover { text-decoration: underline; }
+
+/* 놓친정책 폼 */
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-label { font-size: 12px; font-weight: 600; color: var(--text2); }
+.form-input, .form-textarea {
+  border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; font-size: 13px; font-family: inherit;
+  outline: none; transition: border-color .15s;
+}
+.form-input:focus, .form-textarea:focus { border-color: var(--accent); }
+.form-textarea { resize: vertical; min-height: 80px; }
+.form-submit {
+  width: 100%; padding: 12px; background: var(--accent); color: #fff;
+  border: none; border-radius: 8px; font-size: 14px; font-weight: 700;
+  font-family: inherit; cursor: pointer; transition: opacity .15s; margin-top: 4px;
+}
+.form-submit:hover { opacity: .85; }
+.form-submit:disabled { opacity: .5; cursor: not-allowed; }
+.form-success {
+  text-align: center; padding: 20px 0;
+  font-size: 14px; color: var(--ing); font-weight: 600; display: none;
+}
+.form-note { font-size: 11px; color: var(--text3); line-height: 1.5; }
+
 .filterbar {
   background: var(--white); border-bottom: 1px solid var(--border);
   padding: 12px 20px; display: flex; flex-direction: column; gap: 10px;
@@ -173,6 +240,10 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
     <div class="header-title">경기도 청년정책 상담 대시보드</div>
     <div class="header-date">2026 시행계획 · 경기도 + 31개 시군</div>
   </div>
+  <div class="header-btns">
+    <button class="header-btn header-btn-contact" onclick="openPopup('contact')">📞 담당자 컨택</button>
+    <button class="header-btn header-btn-report"  onclick="openPopup('report')">🔔 놓친정책 알리기</button>
+  </div>
   <div class="header-counts">
     <div class="hc"><div class="hc-dot" style="background:#F87171"></div><span id="cnt-check">-</span> 확인필요</div>
     <div class="hc"><div class="hc-dot ing"></div><span id="cnt-ing">-</span> 모집중</div>
@@ -223,6 +294,66 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
   </div>
   <div class="cards" id="cards"><div class="loading">데이터를 불러오는 중...</div></div>
 </main>
+
+<!-- 담당자 컨택 팝업 -->
+<div class="popup-overlay" id="popup-contact" onclick="closePopupOutside(event,'contact')">
+  <div class="popup-box">
+    <div class="popup-header">
+      <span class="popup-header-title">📞 담당자 컨택</span>
+      <button class="popup-close-btn" onclick="closePopup('contact')">✕</button>
+    </div>
+    <div class="popup-body">
+      <div class="contact-item">
+        <span class="contact-icon">✉️</span>
+        <div>
+          <div class="contact-label">이메일</div>
+          <div class="contact-value"><a href="mailto:bori@gfgf.kr">bori@gfgf.kr</a></div>
+        </div>
+      </div>
+      <div class="contact-item">
+        <span class="contact-icon">📞</span>
+        <div>
+          <div class="contact-label">사무실</div>
+          <div class="contact-value"><a href="tel:031-247-4105">031-247-4105</a></div>
+        </div>
+      </div>
+      <div class="contact-item">
+        <span class="contact-icon">📱</span>
+        <div>
+          <div class="contact-label">휴대폰</div>
+          <div class="contact-value"><a href="tel:010-3700-2325">010-3700-2325</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 놓친정책 알리기 팝업 -->
+<div class="popup-overlay" id="popup-report" onclick="closePopupOutside(event,'report')">
+  <div class="popup-box">
+    <div class="popup-header">
+      <span class="popup-header-title">🔔 놓친정책 알리기</span>
+      <button class="popup-close-btn" onclick="closePopup('report')">✕</button>
+    </div>
+    <div class="popup-body">
+      <form id="report-form" action="https://formspree.io/f/mvzyjqrk" method="POST">
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="form-group">
+            <label class="form-label">🔗 정책 링크</label>
+            <input class="form-input" type="url" name="정책링크" placeholder="https://..." />
+          </div>
+          <div class="form-group">
+            <label class="form-label">📋 전하고 싶은 말</label>
+            <textarea class="form-textarea" name="전하고싶은말" placeholder="어떤 정책인지, 대상, 모집시기 등 알고 있는 내용을 적어주세요." rows="4"></textarea>
+          </div>
+          <p class="form-note">제출하신 내용은 담당자(bori@gfgf.kr)에게 전달되며, 검토 후 대시보드에 반영됩니다.</p>
+          <button class="form-submit" type="submit" id="report-submit">제출하기</button>
+          <div class="form-success" id="report-success">✅ 전달됐습니다! 검토 후 반영할게요 😊</div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <div class="overlay" id="overlay" onclick="closeModal(event)">
   <div class="modal" id="modal">
@@ -457,7 +588,47 @@ function setField(field, el) {
   el.classList.add('active'); render();
 }
 document.getElementById('search').addEventListener('input', e => { state.query=e.target.value.trim(); render(); });
-document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape') { closeModal(); closePopup('contact'); closePopup('report'); } });
+
+// ── 팝업 공통 ──
+function openPopup(id) {
+  document.getElementById('popup-'+id).classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closePopup(id) {
+  document.getElementById('popup-'+id).classList.remove('open');
+  document.body.style.overflow = '';
+}
+function closePopupOutside(e, id) {
+  if (e.target === document.getElementById('popup-'+id)) closePopup(id);
+}
+
+// ── Formspree 제출 ──
+document.getElementById('report-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('report-submit');
+  const success = document.getElementById('report-success');
+  btn.disabled = true;
+  btn.textContent = '전송 중...';
+  try {
+    const resp = await fetch(this.action, {
+      method: 'POST',
+      body: new FormData(this),
+      headers: { 'Accept': 'application/json' }
+    });
+    if (resp.ok) {
+      this.style.display = 'none';
+      success.style.display = 'block';
+      setTimeout(() => { closePopup('report'); this.style.display='flex'; success.style.display='none'; this.reset(); btn.disabled=false; btn.textContent='제출하기'; }, 3000);
+    } else {
+      btn.disabled = false;
+      btn.textContent = '다시 시도해주세요';
+    }
+  } catch {
+    btn.disabled = false;
+    btn.textContent = '오류 - 다시 시도해주세요';
+  }
+});
 </script>
 </body>
 </html>
