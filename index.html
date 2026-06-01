@@ -15,6 +15,7 @@
   --soon: #D97706; --soon-bg: #FFFBEB; --soon-bd: #FDE68A;
   --done: #6B7280; --done-bg: #F9FAFB; --done-bd: #E5E7EB;
   --unknown: #6366F1; --unknown-bg: #EEF2FF; --unknown-bd: #C7D2FE;
+  --check: #DC2626; --check-bg: #FFF1F2; --check-bd: #FECDD3;
 }
 body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
 
@@ -77,10 +78,11 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
   display: flex; flex-direction: column; gap: 10px;
 }
 .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); transform: translateY(-1px); }
-.card.status-ing  { border-left: 4px solid var(--ing); }
-.card.status-soon { border-left: 4px solid var(--soon); }
-.card.status-done { border-left: 4px solid var(--done); opacity: .6; }
+.card.status-ing   { border-left: 4px solid var(--ing); }
+.card.status-soon  { border-left: 4px solid var(--soon); }
+.card.status-done  { border-left: 4px solid var(--done); opacity: .6; }
 .card.status-unknown { border-left: 4px solid var(--border); }
+.card.status-check { border-left: 4px solid var(--check); background: #FFFBFB; }
 
 .card-badges { display: flex; gap: 6px; flex-wrap: wrap; }
 .badge {
@@ -91,6 +93,7 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
 .badge-status-모집예정 { background: var(--soon-bg);    color: var(--soon);    border: 1px solid var(--soon-bd); }
 .badge-status-마감     { background: var(--done-bg);    color: var(--done);    border: 1px solid var(--done-bd); }
 .badge-status-미정     { background: var(--unknown-bg); color: var(--unknown); border: 1px solid var(--unknown-bd); }
+.badge-status-확인필요 { background: var(--check-bg);  color: var(--check);   border: 1px solid var(--check-bd); font-weight:700; }
 .badge-city { background: #F3F4F6; color: #374151; border: 1px solid #E5E7EB; }
 .badge-경기도 { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; font-weight:700; }
 .badge-field-일자리 { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
@@ -171,6 +174,7 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
     <div class="header-date">2026 시행계획 · 경기도 + 31개 시군</div>
   </div>
   <div class="header-counts">
+    <div class="hc"><div class="hc-dot" style="background:#F87171"></div><span id="cnt-check">-</span> 확인필요</div>
     <div class="hc"><div class="hc-dot ing"></div><span id="cnt-ing">-</span> 모집중</div>
     <div class="hc"><div class="hc-dot soon"></div><span id="cnt-soon">-</span> 모집예정</div>
     <div class="hc"><div class="hc-dot unknown"></div><span id="cnt-unknown">-</span> 미정</div>
@@ -186,6 +190,7 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
   </div>
   <div class="filter-row">
     <span class="filter-label">상태</span>
+    <div class="chip status-check active" data-status="확인필요" onclick="toggleStatus('확인필요',this)">🔴 확인필요</div>
     <div class="chip status-ing active" data-status="모집중" onclick="toggleStatus('모집중',this)">🟢 모집중</div>
     <div class="chip status-soon active" data-status="모집예정" onclick="toggleStatus('모집예정',this)">🟡 모집예정</div>
     <div class="chip status-unknown active" data-status="미정" onclick="toggleStatus('미정',this)">⚪ 미정</div>
@@ -239,6 +244,8 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" id="btn-copy" onclick="copyContact()">📋 문의처 복사</button>
+      <button class="btn btn-secondary" id="btn-prev" onclick="openPrevLink()" style="display:none">📂 전년도 공고</button>
+      <button class="btn btn-secondary" id="btn-search" onclick="openSearch()" style="display:none">🔍 공고 검색</button>
       <button class="btn btn-primary" id="btn-link" onclick="openLink()">🔗 신청 바로가기</button>
     </div>
   </div>
@@ -246,7 +253,7 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
 
 <script>
 let DATA = [];
-let state = { statuses: new Set(['모집중','모집예정','미정']), city: 'all', field: 'all', query: '' };
+let state = { statuses: new Set(['확인필요','모집중','모집예정','미정']), city: 'all', field: 'all', query: '' };
 let currentItem = null;
 
 fetch('data.json')
@@ -254,6 +261,7 @@ fetch('data.json')
   .then(json => {
     DATA = json;
     buildCityChips();
+    document.getElementById('cnt-check').textContent = DATA.filter(d=>d.모집상태==='확인필요').length;
     document.getElementById('cnt-ing').textContent = DATA.filter(d=>d.모집상태==='모집중').length;
     document.getElementById('cnt-soon').textContent = DATA.filter(d=>d.모집상태==='모집예정').length;
     document.getElementById('cnt-unknown').textContent = DATA.filter(d=>d.모집상태==='미정').length;
@@ -292,7 +300,7 @@ function getFiltered() {
       (d.시군||'').toLowerCase().includes(q)
     );
   }
-  const STATUS_ORDER = {'모집중':0,'모집예정':1,'미정':2,'마감':3};
+  const STATUS_ORDER = {'확인필요':0,'모집중':1,'모집예정':2,'미정':3,'마감':4};
   const FIELD_ORDER  = ['일자리','주거','교육ㆍ직업훈련','금융ㆍ복지ㆍ문화','참여권리'];
   const sort = document.getElementById('sort-select').value;
   if (sort === 'status') {
@@ -316,7 +324,7 @@ function render() {
     document.getElementById('cards').innerHTML = '<div class="empty"><p>조건에 맞는 정책이 없습니다.</p></div>';
     return;
   }
-  const SC = {'모집중':'ing','모집예정':'soon','마감':'done','미정':'unknown'};
+  const SC = {'확인필요':'check','모집중':'ing','모집예정':'soon','마감':'done','미정':'unknown'};
   const FC = (f) => (f||'').replace(/ㆍ/g,'').replace(/\s/g,'');
   document.getElementById('cards').innerHTML = items.map(d => {
     const st = d.모집상태||'미정';
@@ -337,7 +345,10 @@ function render() {
       ${d.주요내용 ? `<div class="card-summary">${(d.주요내용).substring(0,80)}...</div>` : ''}
       <div class="card-footer">
         <span class="card-org">${d.운영기관||d.문의처||''}</span>
-        ${d.링크 ? `<a class="card-link" href="${d.링크}" target="_blank" onclick="event.stopPropagation()">신청하기 →</a>` : ''}
+        <div style="display:flex;gap:6px;align-items:center;">
+          ${st==='확인필요' ? `<a class="card-link" style="color:var(--check)" href="https://www.google.com/search?q=${encodeURIComponent((d.사업명||'')+' 2026 모집')}" target="_blank" onclick="event.stopPropagation()">🔍 공고검색</a>` : ''}
+          ${(d.링크_모집||d.링크) ? `<a class="card-link" href="${d.링크_모집||d.링크}" target="_blank" onclick="event.stopPropagation()">신청하기 →</a>` : ''}
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -346,7 +357,7 @@ function render() {
 function openModal(idx) {
   const d = DATA[idx]; currentItem = d;
   const st = d.모집상태||'미정';
-  const sc = {'모집중':'ing','모집예정':'soon','마감':'done','미정':'unknown'}[st]||'unknown';
+  const sc = {'확인필요':'check','모집중':'ing','모집예정':'soon','마감':'done','미정':'unknown'}[st]||'unknown';
   const FC = (f) => (f||'').replace(/ㆍ/g,'').replace(/\s/g,'');
   const isGG = d.시군 === '경기도';
   document.getElementById('modal-badges').innerHTML =
@@ -360,7 +371,10 @@ function openModal(idx) {
     <div class="modal-item"><div class="modal-item-label">📝 신청방법</div><div class="modal-item-value">${d.신청방법||'-'}</div></div>
     <div class="modal-item"><div class="modal-item-label">🏢 운영기관</div><div class="modal-item-value">${d.운영기관||'-'}</div></div>
     <div class="modal-item"><div class="modal-item-label">📞 문의처</div><div class="modal-item-value">${d.문의처||'-'}</div></div>`;
-  document.getElementById('btn-link').style.display = d.링크 ? '' : 'none';
+  const activeLink = d.링크_모집 || d.링크 || '';
+  document.getElementById('btn-link').style.display   = activeLink ? '' : 'none';
+  document.getElementById('btn-prev').style.display   = d.링크_전년도 ? '' : 'none';
+  document.getElementById('btn-search').style.display = (st === '확인필요') ? '' : 'none';
   document.getElementById('overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -381,7 +395,9 @@ function copyContact() {
   });
 }
 
-function openLink() { if (currentItem?.링크) window.open(currentItem.링크, '_blank'); }
+function openLink()     { const l=currentItem?.링크_모집||currentItem?.링크; if(l) window.open(l,'_blank'); }
+function openPrevLink() { if(currentItem?.링크_전년도) window.open(currentItem.링크_전년도,'_blank'); }
+function openSearch()   { if(currentItem) window.open(`https://www.google.com/search?q=${encodeURIComponent(currentItem.사업명+' 2026 모집 공고')}`,'_blank'); }
 
 function toggleStatus(status, el) {
   if (state.statuses.has(status)) {
