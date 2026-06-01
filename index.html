@@ -1,931 +1,407 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>2026 경기도 청년정책 상담 대시보드</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@700&display=swap" rel="stylesheet">
+<title>경기도 청년정책 상담 대시보드 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #F0F2F5; --white: #FFFFFF; --border: #E4E7EC;
+  --text: #111827; --text2: #6B7280; --text3: #9CA3AF;
+  --accent: #1B5E42; --accent-light: #E8F5EE;
+  --ing: #059669; --ing-bg: #ECFDF5; --ing-bd: #A7F3D0;
+  --soon: #D97706; --soon-bg: #FFFBEB; --soon-bd: #FDE68A;
+  --done: #6B7280; --done-bg: #F9FAFB; --done-bd: #E5E7EB;
+  --unknown: #6366F1; --unknown-bg: #EEF2FF; --unknown-bd: #C7D2FE;
+}
+body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
 
-  :root {
-    --c-bg: #F5F3EE;
-    --c-surface: #FFFFFF;
-    --c-border: #E2DDD6;
-    --c-text-primary: #1A1916;
-    --c-text-secondary: #6B6760;
-    --c-text-muted: #A09C96;
-    --c-accent: #1D6A4A;
-    --c-accent-light: #E6F4EC;
-    --c-accent-mid: #3A9E6E;
+.header {
+  background: var(--accent); color: #fff; padding: 14px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 200;
+}
+.header-title { font-size: 16px; font-weight: 700; }
+.header-date { font-size: 12px; opacity: .7; }
+.header-counts { display: flex; gap: 16px; font-size: 12px; }
+.hc { display: flex; align-items: center; gap: 5px; }
+.hc-dot { width: 8px; height: 8px; border-radius: 50%; }
+.hc-dot.ing { background: #34D399; }
+.hc-dot.soon { background: #FCD34D; }
+.hc-dot.unknown { background: #A5B4FC; }
 
-    --field-job: #2563A8;
-    --field-job-bg: #EFF5FF;
-    --field-house: #A05C00;
-    --field-house-bg: #FFF4E5;
-    --field-edu: #6B21A8;
-    --field-edu-bg: #F5EDFF;
-    --field-welfare: #0F766E;
-    --field-welfare-bg: #ECFDF5;
-    --field-part: #B91C1C;
-    --field-part-bg: #FEF2F2;
-  }
+.filterbar {
+  background: var(--white); border-bottom: 1px solid var(--border);
+  padding: 12px 20px; display: flex; flex-direction: column; gap: 10px;
+  position: sticky; top: 49px; z-index: 150;
+}
+.filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.filter-label { font-size: 11px; font-weight: 600; color: var(--text2); min-width: 40px; }
+.search-box {
+  display: flex; align-items: center; gap: 6px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 6px 10px; background: var(--bg); flex: 1; max-width: 320px;
+}
+.search-box input { border: none; background: transparent; outline: none; font-size: 13px; font-family: inherit; width: 100%; }
 
-  body {
-    font-family: 'Noto Sans KR', sans-serif;
-    background: var(--c-bg);
-    color: var(--c-text-primary);
-    min-height: 100vh;
-    font-size: 14px;
-    line-height: 1.6;
-  }
+.chip {
+  padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+  border: 1.5px solid var(--border); background: var(--white); cursor: pointer;
+  transition: all .15s; white-space: nowrap; color: var(--text2);
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.chip.status-ing.active { background: var(--ing); border-color: var(--ing); }
+.chip.status-soon.active { background: var(--soon); border-color: var(--soon); }
+.chip.status-done.active { background: var(--done); border-color: var(--done); }
+.chip.status-unknown.active { background: var(--unknown); border-color: var(--unknown); }
 
-  /* ─── 헤더 ─── */
-  .header {
-    background: var(--c-text-primary);
-    color: #fff;
-    padding: 20px 28px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .header-left {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-  }
-  .header-title {
-    font-family: 'Noto Serif KR', serif;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-  .header-sub {
-    font-size: 12px;
-    color: rgba(255,255,255,.5);
-    letter-spacing: .04em;
-  }
-  .header-stats {
-    display: flex;
-    gap: 20px;
-  }
-  .hstat {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-  }
-  .hstat-num {
-    font-size: 20px;
-    font-weight: 700;
-    line-height: 1;
-  }
-  .hstat-label {
-    font-size: 10px;
-    color: rgba(255,255,255,.45);
-    margin-top: 2px;
-  }
+.main { padding: 16px 20px; max-width: 1400px; margin: 0 auto; }
+.result-bar {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+}
+.result-count { font-size: 13px; color: var(--text2); }
+.result-count strong { color: var(--text); }
+.sort-select {
+  font-size: 12px; border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 8px; font-family: inherit; background: var(--white); color: var(--text2);
+}
 
-  /* ─── 레이아웃 ─── */
-  .layout {
-    display: grid;
-    grid-template-columns: 260px 1fr;
-    height: calc(100vh - 65px);
-  }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
 
-  /* ─── 사이드바 ─── */
-  .sidebar {
-    background: var(--c-surface);
-    border-right: 1px solid var(--c-border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .sidebar-section {
-    padding: 16px 18px 12px;
-    border-bottom: 1px solid var(--c-border);
-  }
-  .sidebar-section:last-child {
-    border-bottom: none;
-    flex: 1;
-    overflow-y: auto;
-  }
-  .sidebar-label {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: var(--c-text-muted);
-    margin-bottom: 10px;
-  }
+.card {
+  background: var(--white); border: 1.5px solid var(--border); border-radius: 12px;
+  padding: 16px; cursor: pointer; transition: box-shadow .15s, transform .1s;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); transform: translateY(-1px); }
+.card.status-ing  { border-left: 4px solid var(--ing); }
+.card.status-soon { border-left: 4px solid var(--soon); }
+.card.status-done { border-left: 4px solid var(--done); opacity: .6; }
+.card.status-unknown { border-left: 4px solid var(--border); }
 
-  /* 검색 */
-  .search-wrap {
-    position: relative;
-  }
-  .search-input {
-    width: 100%;
-    padding: 9px 12px 9px 34px;
-    border: 1.5px solid var(--c-border);
-    border-radius: 8px;
-    font-family: inherit;
-    font-size: 13px;
-    background: var(--c-bg);
-    color: var(--c-text-primary);
-    outline: none;
-    transition: border-color .15s;
-  }
-  .search-input:focus { border-color: var(--c-accent-mid); }
-  .search-icon {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--c-text-muted);
-    font-size: 14px;
-    pointer-events: none;
-  }
+.card-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.badge-status-모집중   { background: var(--ing-bg);     color: var(--ing);     border: 1px solid var(--ing-bd); }
+.badge-status-모집예정 { background: var(--soon-bg);    color: var(--soon);    border: 1px solid var(--soon-bd); }
+.badge-status-마감     { background: var(--done-bg);    color: var(--done);    border: 1px solid var(--done-bd); }
+.badge-status-미정     { background: var(--unknown-bg); color: var(--unknown); border: 1px solid var(--unknown-bd); }
+.badge-city { background: #F3F4F6; color: #374151; border: 1px solid #E5E7EB; }
+.badge-경기도 { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; font-weight:700; }
+.badge-field-일자리 { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+.badge-field-주거 { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
+.badge-field-교육직업훈련 { background: #F5F3FF; color: #6D28D9; border: 1px solid #DDD6FE; }
+.badge-field-금융복지문화 { background: #F0FDFA; color: #0F766E; border: 1px solid #99F6E4; }
+.badge-field-참여권리 { background: #FFF1F2; color: #BE123C; border: 1px solid #FECDD3; }
 
-  /* 분야 필터 */
-  .field-chips {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .field-chip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 7px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background .12s;
-    border: 1.5px solid transparent;
-    font-size: 13px;
-  }
-  .field-chip:hover { background: var(--c-bg); }
-  .field-chip.active {
-    border-color: currentColor;
-    background: var(--c-surface);
-  }
-  .field-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .field-name { flex: 1; font-weight: 500; }
-  .field-count {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--c-text-muted);
-  }
+.card-title { font-size: 14px; font-weight: 600; line-height: 1.4; }
+.card-recruit { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
+.card-recruit-text { font-weight: 600; }
+.card-recruit-text.ing { color: var(--ing); }
+.card-recruit-text.soon { color: var(--soon); }
+.card-recruit-text.unknown { color: var(--text3); }
+.card-recruit-text.done { color: var(--done); }
+.card-summary {
+  font-size: 12px; color: var(--text2); line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.card-org { font-size: 11px; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-link { font-size: 11px; color: var(--accent); font-weight: 500; text-decoration: none; white-space: nowrap; }
+.card-link:hover { text-decoration: underline; }
 
-  /* 시군 필터 */
-  .city-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
-  }
-  .city-btn {
-    padding: 5px 4px;
-    font-family: inherit;
-    font-size: 11.5px;
-    text-align: center;
-    border: 1.5px solid var(--c-border);
-    border-radius: 6px;
-    background: transparent;
-    cursor: pointer;
-    color: var(--c-text-secondary);
-    transition: all .12s;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .city-btn:hover { background: var(--c-bg); color: var(--c-text-primary); }
-  .city-btn.active {
-    background: var(--c-text-primary);
-    color: #fff;
-    border-color: var(--c-text-primary);
-  }
-  .city-all-btn {
-    grid-column: 1 / -1;
-    padding: 6px;
-    font-family: inherit;
-    font-size: 12px;
-    border: 1.5px solid var(--c-border);
-    border-radius: 6px;
-    background: transparent;
-    cursor: pointer;
-    color: var(--c-text-secondary);
-    transition: all .12s;
-    margin-bottom: 2px;
-  }
-  .city-all-btn:hover { background: var(--c-bg); }
-  .city-all-btn.active {
-    background: var(--c-accent);
-    color: #fff;
-    border-color: var(--c-accent);
-  }
+.overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4);
+  z-index: 500; align-items: center; justify-content: center; padding: 20px;
+}
+.overlay.open { display: flex; }
+.modal {
+  background: var(--white); border-radius: 16px; width: 100%; max-width: 600px;
+  max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+.modal-header {
+  padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  position: sticky; top: 0; background: var(--white); border-radius: 16px 16px 0 0;
+}
+.modal-header-left { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.modal-title { font-size: 17px; font-weight: 700; line-height: 1.4; }
+.modal-close {
+  width: 30px; height: 30px; border: none; background: var(--bg); border-radius: 50%;
+  cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.modal-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.modal-section-title { font-size: 11px; font-weight: 700; color: var(--text3); letter-spacing: .05em; margin-bottom: 6px; }
+.modal-text { font-size: 13px; line-height: 1.7; color: var(--text); white-space: pre-line; }
+.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.modal-item { background: var(--bg); border-radius: 8px; padding: 10px 12px; }
+.modal-item-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; }
+.modal-item-value { font-size: 13px; font-weight: 500; line-height: 1.4; }
+.modal-item-value.ing { color: var(--ing); }
+.modal-item-value.soon { color: var(--soon); }
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 10px; }
+.btn {
+  flex: 1; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  font-family: inherit; cursor: pointer; border: none; transition: opacity .15s;
+}
+.btn:hover { opacity: .85; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-secondary { background: var(--bg); color: var(--text2); border: 1px solid var(--border); }
 
-  /* ─── 메인 콘텐츠 ─── */
-  .main {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .main-toolbar {
-    padding: 14px 22px 12px;
-    border-bottom: 1px solid var(--c-border);
-    background: var(--c-surface);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-shrink: 0;
-  }
-  .result-info {
-    font-size: 13px;
-    color: var(--c-text-secondary);
-  }
-  .result-count {
-    font-weight: 700;
-    color: var(--c-text-primary);
-    font-size: 15px;
-  }
-  .sort-wrap {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-  }
-  .sort-label {
-    font-size: 12px;
-    color: var(--c-text-muted);
-  }
-  .sort-btn {
-    font-family: inherit;
-    font-size: 12px;
-    padding: 4px 10px;
-    border: 1px solid var(--c-border);
-    border-radius: 6px;
-    background: transparent;
-    cursor: pointer;
-    color: var(--c-text-secondary);
-    transition: all .1s;
-  }
-  .sort-btn.active {
-    background: var(--c-text-primary);
-    color: #fff;
-    border-color: var(--c-text-primary);
-  }
-  .reset-btn {
-    font-family: inherit;
-    font-size: 12px;
-    padding: 4px 10px;
-    border: 1px solid var(--c-border);
-    border-radius: 6px;
-    background: transparent;
-    cursor: pointer;
-    color: var(--c-accent);
-    border-color: var(--c-accent-light);
-    transition: all .1s;
-  }
-  .reset-btn:hover { background: var(--c-accent-light); }
+.empty { text-align: center; padding: 60px 20px; color: var(--text3); }
+.loading { text-align: center; padding: 80px 20px; color: var(--text3); }
 
-  /* 카드 그리드 */
-  .cards-area {
-    flex: 1;
-    overflow-y: auto;
-    padding: 18px 22px 30px;
-  }
-  .cards-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 14px;
-  }
-  .card {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 12px;
-    padding: 16px 18px;
-    cursor: pointer;
-    transition: all .15s;
-    position: relative;
-    overflow: hidden;
-  }
-  .card::before {
-    content: '';
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 4px;
-    background: var(--card-accent, #ccc);
-    border-radius: 12px 0 0 12px;
-  }
-  .card:hover {
-    border-color: var(--c-accent-mid);
-    box-shadow: 0 4px 16px rgba(0,0,0,.08);
-    transform: translateY(-1px);
-  }
-  .card-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-  .field-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 700;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-  .city-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 7px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 500;
-    background: var(--c-bg);
-    color: var(--c-text-secondary);
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-  .card-title {
-    font-size: 14px;
-    font-weight: 700;
-    line-height: 1.4;
-    color: var(--c-text-primary);
-    margin-bottom: 6px;
-    padding-left: 4px;
-  }
-  .card-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding-left: 4px;
-  }
-  .card-meta-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--c-text-muted);
-  }
-  .card-meta-item svg {
-    flex-shrink: 0;
-  }
-  .no-results {
-    padding: 60px 20px;
-    text-align: center;
-    color: var(--c-text-muted);
-  }
-  .no-results-num { font-size: 48px; margin-bottom: 8px; }
-  .no-results-msg { font-size: 15px; }
-
-  /* ─── 모달 ─── */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.4);
-    z-index: 200;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity .2s;
-  }
-  .modal-overlay.open {
-    opacity: 1;
-    pointer-events: all;
-  }
-  .modal {
-    background: var(--c-surface);
-    border-radius: 16px;
-    width: 100%;
-    max-width: 580px;
-    max-height: 80vh;
-    overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0,0,0,.2);
-    transform: translateY(16px);
-    transition: transform .2s;
-  }
-  .modal-overlay.open .modal {
-    transform: translateY(0);
-  }
-  .modal-header {
-    padding: 20px 22px 16px;
-    border-bottom: 1px solid var(--c-border);
-    position: sticky;
-    top: 0;
-    background: var(--c-surface);
-    border-radius: 16px 16px 0 0;
-    z-index: 1;
-  }
-  .modal-badges {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 10px;
-    flex-wrap: wrap;
-  }
-  .modal-title {
-    font-size: 18px;
-    font-weight: 700;
-    line-height: 1.35;
-    letter-spacing: -.02em;
-  }
-  .modal-body {
-    padding: 18px 22px 22px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  .modal-section-title {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: var(--c-text-muted);
-    margin-bottom: 6px;
-  }
-  .modal-content-text {
-    font-size: 13.5px;
-    line-height: 1.7;
-    color: var(--c-text-secondary);
-    white-space: pre-line;
-  }
-  .modal-meta-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .modal-meta-cell {
-    background: var(--c-bg);
-    border-radius: 8px;
-    padding: 10px 12px;
-  }
-  .modal-meta-cell.full { grid-column: 1 / -1; }
-  .modal-meta-key {
-    font-size: 11px;
-    color: var(--c-text-muted);
-    font-weight: 700;
-    letter-spacing: .04em;
-    margin-bottom: 3px;
-  }
-  .modal-meta-val {
-    font-size: 13px;
-    color: var(--c-text-primary);
-    line-height: 1.5;
-    word-break: break-all;
-  }
-  .modal-link {
-    color: var(--c-accent);
-    text-decoration: none;
-    font-size: 13px;
-  }
-  .modal-link:hover { text-decoration: underline; }
-  .modal-actions {
-    display: flex;
-    gap: 8px;
-    padding: 0 22px 20px;
-  }
-  .btn-close {
-    flex: 1;
-    padding: 10px;
-    border: 1.5px solid var(--c-border);
-    border-radius: 8px;
-    background: transparent;
-    font-family: inherit;
-    font-size: 13px;
-    cursor: pointer;
-    color: var(--c-text-secondary);
-    transition: background .1s;
-  }
-  .btn-close:hover { background: var(--c-bg); }
-  .btn-copy {
-    flex: 1;
-    padding: 10px;
-    border: none;
-    border-radius: 8px;
-    background: var(--c-text-primary);
-    font-family: inherit;
-    font-size: 13px;
-    cursor: pointer;
-    color: #fff;
-    transition: opacity .1s;
-  }
-  .btn-copy:hover { opacity: .85; }
-  .btn-link {
-    flex: 1;
-    padding: 10px;
-    border: 1.5px solid var(--c-accent);
-    border-radius: 8px;
-    background: var(--c-accent-light);
-    font-family: inherit;
-    font-size: 13px;
-    cursor: pointer;
-    color: var(--c-accent);
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    transition: background .1s;
-  }
-  .btn-link:hover { background: #cce9d8; }
-
-  /* 스크롤바 */
-  .cards-area::-webkit-scrollbar,
-  .modal::-webkit-scrollbar,
-  .sidebar-section::-webkit-scrollbar { width: 4px; }
-  .cards-area::-webkit-scrollbar-thumb,
-  .modal::-webkit-scrollbar-thumb,
-  .sidebar-section::-webkit-scrollbar-thumb {
-    background: var(--c-border);
-    border-radius: 2px;
-  }
-
-  /* 강조 하이라이트 */
-  mark {
-    background: #FFF176;
-    color: inherit;
-    border-radius: 2px;
-    padding: 0 1px;
-  }
+@media (max-width: 600px) {
+  .header-counts { display: none; }
+  .cards { grid-template-columns: 1fr; }
+  .modal-grid { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
 
 <header class="header">
-  <div class="header-left">
-    <span class="header-title">경기도 청년정책 상담 대시보드</span>
-    <span class="header-sub">2026 시행계획 · 31개 시군</span>
+  <div>
+    <div class="header-title">경기도 청년정책 상담 대시보드</div>
+    <div class="header-date">2026 시행계획 · 경기도 + 31개 시군</div>
   </div>
-  <div class="header-stats">
-    <div class="hstat"><span class="hstat-num" id="h-total">646</span><span class="hstat-label">전체 사업</span></div>
-    <div class="hstat"><span class="hstat-num" id="h-showing">646</span><span class="hstat-label">현재 표시</span></div>
+  <div class="header-counts">
+    <div class="hc"><div class="hc-dot ing"></div><span id="cnt-ing">-</span> 모집중</div>
+    <div class="hc"><div class="hc-dot soon"></div><span id="cnt-soon">-</span> 모집예정</div>
+    <div class="hc"><div class="hc-dot unknown"></div><span id="cnt-unknown">-</span> 미정</div>
   </div>
 </header>
 
-<div class="layout">
-
-  <!-- 사이드바 -->
-  <aside class="sidebar">
-    <!-- 검색 -->
-    <div class="sidebar-section">
-      <div class="sidebar-label">사업명 검색</div>
-      <div class="search-wrap">
-        <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input class="search-input" type="text" id="search-input" placeholder="예: 면접정장, 창업, 주거..." autocomplete="off">
-      </div>
+<div class="filterbar">
+  <div class="filter-row">
+    <div class="search-box">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="search" placeholder="사업명, 내용으로 검색..." autocomplete="off">
     </div>
-
-    <!-- 분야 필터 -->
-    <div class="sidebar-section">
-      <div class="sidebar-label">정책 분야</div>
-      <div class="field-chips" id="field-chips">
-        <div class="field-chip active" data-field="all" onclick="setField('all', this)">
-          <span class="field-dot" style="background:#888"></span>
-          <span class="field-name">전체 분야</span>
-          <span class="field-count" id="count-all">646</span>
-        </div>
-        <div class="field-chip" data-field="일자리" onclick="setField('일자리', this)">
-          <span class="field-dot" style="background:var(--field-job)"></span>
-          <span class="field-name">일자리</span>
-          <span class="field-count" id="count-일자리">214</span>
-        </div>
-        <div class="field-chip" data-field="주거" onclick="setField('주거', this)">
-          <span class="field-dot" style="background:var(--field-house)"></span>
-          <span class="field-name">주거</span>
-          <span class="field-count" id="count-주거">72</span>
-        </div>
-        <div class="field-chip" data-field="교육ㆍ직업훈련" onclick="setField('교육ㆍ직업훈련', this)">
-          <span class="field-dot" style="background:var(--field-edu)"></span>
-          <span class="field-name">교육·직업훈련</span>
-          <span class="field-count" id="count-교육ㆍ직업훈련">73</span>
-        </div>
-        <div class="field-chip" data-field="금융ㆍ복지ㆍ문화" onclick="setField('금융ㆍ복지ㆍ문화', this)">
-          <span class="field-dot" style="background:var(--field-welfare)"></span>
-          <span class="field-name">금융·복지·문화</span>
-          <span class="field-count" id="count-금융ㆍ복지ㆍ문화">127</span>
-        </div>
-        <div class="field-chip" data-field="참여권리" onclick="setField('참여권리', this)">
-          <span class="field-dot" style="background:var(--field-part)"></span>
-          <span class="field-name">참여·권리</span>
-          <span class="field-count" id="count-참여권리">160</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 시군 필터 -->
-    <div class="sidebar-section">
-      <div class="sidebar-label">시군 선택</div>
-      <div id="city-container">
-        <button class="city-all-btn active" id="city-all-btn" onclick="setCity('all')">전체 시군</button>
-        <div class="city-grid" id="city-grid"></div>
-      </div>
-    </div>
-  </aside>
-
-  <!-- 메인 -->
-  <main class="main">
-    <div class="main-toolbar">
-      <div class="result-info">
-        <span class="result-count" id="result-count">646</span>
-        <span>개 사업</span>
-        <span id="filter-desc" style="color:var(--c-text-muted);margin-left:6px;font-size:12px"></span>
-      </div>
-      <div class="sort-wrap">
-        <span class="sort-label">정렬</span>
-        <button class="sort-btn active" id="sort-field" onclick="setSortMode('field')">분야순</button>
-        <button class="sort-btn" id="sort-city" onclick="setSortMode('city')">시군순</button>
-        <button class="reset-btn" onclick="resetAll()">필터 초기화</button>
-      </div>
-    </div>
-    <div class="cards-area" id="cards-area">
-      <div class="cards-grid" id="cards-grid"></div>
-    </div>
-  </main>
-
+  </div>
+  <div class="filter-row">
+    <span class="filter-label">상태</span>
+    <div class="chip status-ing active" data-status="모집중" onclick="toggleStatus('모집중',this)">🟢 모집중</div>
+    <div class="chip status-soon active" data-status="모집예정" onclick="toggleStatus('모집예정',this)">🟡 모집예정</div>
+    <div class="chip status-unknown active" data-status="미정" onclick="toggleStatus('미정',this)">⚪ 미정</div>
+    <div class="chip status-done" data-status="마감" onclick="toggleStatus('마감',this)">⚫ 마감</div>
+  </div>
+  <div class="filter-row">
+    <span class="filter-label">지역</span>
+    <div id="city-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+  </div>
+  <div class="filter-row">
+    <span class="filter-label">분야</span>
+    <div class="chip active" data-field="all" onclick="setField('all',this)">전체</div>
+    <div class="chip" data-field="일자리" onclick="setField('일자리',this)">💼 일자리</div>
+    <div class="chip" data-field="주거" onclick="setField('주거',this)">🏠 주거</div>
+    <div class="chip" data-field="교육ㆍ직업훈련" onclick="setField('교육ㆍ직업훈련',this)">📚 교육</div>
+    <div class="chip" data-field="금융ㆍ복지ㆍ문화" onclick="setField('금융ㆍ복지ㆍ문화',this)">💰 금융·복지</div>
+    <div class="chip" data-field="참여권리" onclick="setField('참여권리',this)">🤝 참여권리</div>
+  </div>
 </div>
 
-<!-- 모달 -->
-<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+<main class="main">
+  <div class="result-bar">
+    <div class="result-count" id="result-count"></div>
+    <select class="sort-select" id="sort-select" onchange="render()">
+      <option value="status">모집상태순</option>
+      <option value="city">지역순</option>
+      <option value="field">분야순</option>
+    </select>
+  </div>
+  <div class="cards" id="cards"><div class="loading">데이터를 불러오는 중...</div></div>
+</main>
+
+<div class="overlay" id="overlay" onclick="closeModal(event)">
   <div class="modal" id="modal">
     <div class="modal-header">
-      <div class="modal-badges" id="modal-badges"></div>
-      <div class="modal-title" id="modal-title"></div>
+      <div class="modal-header-left">
+        <div class="modal-badges" id="modal-badges"></div>
+        <div class="modal-title" id="modal-title"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body">
       <div>
-        <div class="modal-section-title">사업 내용</div>
-        <div class="modal-content-text" id="modal-content"></div>
+        <div class="modal-section-title">📋 모집정보</div>
+        <div class="modal-grid" id="modal-info"></div>
       </div>
-      <div class="modal-meta-grid" id="modal-meta"></div>
+      <div>
+        <div class="modal-section-title">📌 주요내용</div>
+        <div class="modal-text" id="modal-content"></div>
+      </div>
     </div>
-    <div class="modal-actions" id="modal-actions"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-copy" onclick="copyContact()">📋 문의처 복사</button>
+      <button class="btn btn-primary" id="btn-link" onclick="openLink()">🔗 신청 바로가기</button>
+    </div>
   </div>
 </div>
 
 <script>
 let DATA = [];
+let state = { statuses: new Set(['모집중','모집예정','미정']), city: 'all', field: 'all', query: '' };
+let currentItem = null;
 
 fetch('data.json')
   .then(r => r.json())
   .then(json => {
     DATA = json;
-    init();
+    buildCityChips();
+    document.getElementById('cnt-ing').textContent = DATA.filter(d=>d.모집상태==='모집중').length;
+    document.getElementById('cnt-soon').textContent = DATA.filter(d=>d.모집상태==='모집예정').length;
+    document.getElementById('cnt-unknown').textContent = DATA.filter(d=>d.모집상태==='미정').length;
+    render();
   })
   .catch(() => {
-    document.getElementById('cards-grid').innerHTML = '<p style="padding:40px;color:#888">데이터를 불러오지 못했습니다. data.json 파일을 확인해주세요.</p>';
+    document.getElementById('cards').innerHTML = '<div class="empty"><p>데이터를 불러오지 못했습니다.</p></div>';
   });
 
-const FIELD_STYLE = {
-  '일자리':       { color: 'var(--field-job)',     bg: 'var(--field-job-bg)',     accent: '#2563A8' },
-  '주거':         { color: 'var(--field-house)',   bg: 'var(--field-house-bg)',   accent: '#A05C00' },
-  '교육ㆍ직업훈련': { color: 'var(--field-edu)',     bg: 'var(--field-edu-bg)',     accent: '#6B21A8' },
-  '금융ㆍ복지ㆍ문화': { color: 'var(--field-welfare)', bg: 'var(--field-welfare-bg)', accent: '#0F766E' },
-  '참여권리':     { color: 'var(--field-part)',    bg: 'var(--field-part-bg)',    accent: '#B91C1C' },
-};
-
-const FIELD_LABEL = {
-  '교육ㆍ직업훈련': '교육·직업훈련',
-  '금융ㆍ복지ㆍ문화': '금융·복지·문화',
-  '참여권리': '참여·권리',
-};
-
-const CITIES = ["가평군", "고양시", "과천시", "광명시", "광주시", "구리시", "군포시", "김포시", "남양주시", "동두천시", "부천시", "성남시", "수원시", "시흥시", "안산시", "안성시", "안양시", "양주시", "양평군", "여주시", "연천군", "오산시", "용인시", "의왕시", "의정부시", "이천시", "파주시", "평택시", "포천시", "하남시", "화성시"];
-
-let state = {
-  field: 'all',
-  city: 'all',
-  query: '',
-  sort: 'field',
-};
-
-let currentItem = null;
-
-// ─── 초기화 ───
-function init() {
-  // 시군 버튼 생성
-  const grid = document.getElementById('city-grid');
-  CITIES.forEach(c => {
-    const btn = document.createElement('button');
-    btn.className = 'city-btn';
-    btn.textContent = c.replace('시','').replace('군','');
-    btn.title = c;
-    btn.onclick = () => setCity(c);
-    btn.id = 'city-' + c;
-    grid.appendChild(btn);
-  });
-  render();
+function buildCityChips() {
+  const sigungu = [...new Set(DATA.filter(d=>d.시군!=='경기도').map(d=>d.시군))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const cities = ['all', '경기도', ...sigungu];
+  document.getElementById('city-chips').innerHTML = cities.map(c => {
+    const label = c==='all' ? '전체' : c==='경기도' ? '🌐 경기도 전체' : c;
+    return `<div class="chip ${c==='all'?'active':''}" data-city="${c}" onclick="setCity('${c}',this)">${label}</div>`;
+  }).join('');
 }
 
-// ─── 필터 함수 ───
-function setField(f, el) {
-  state.field = f;
-  document.querySelectorAll('.field-chip').forEach(e => e.classList.remove('active'));
-  el.classList.add('active');
-  render();
-}
-
-function setCity(c) {
-  state.city = c;
-  document.querySelectorAll('.city-btn').forEach(e => e.classList.remove('active'));
-  document.getElementById('city-all-btn').classList.remove('active');
-  if (c === 'all') {
-    document.getElementById('city-all-btn').classList.add('active');
-  } else {
-    const btn = document.getElementById('city-' + c);
-    if (btn) btn.classList.add('active');
-  }
-  render();
-}
-
-function setSortMode(m) {
-  state.sort = m;
-  document.getElementById('sort-field').classList.toggle('active', m === 'field');
-  document.getElementById('sort-city').classList.toggle('active', m === 'city');
-  render();
-}
-
-function resetAll() {
-  state = { field: 'all', city: 'all', query: '', sort: 'field' };
-  document.querySelectorAll('.field-chip').forEach(e => e.classList.remove('active'));
-  document.querySelector('.field-chip[data-field="all"]').classList.add('active');
-  document.querySelectorAll('.city-btn').forEach(e => e.classList.remove('active'));
-  document.getElementById('city-all-btn').classList.add('active');
-  document.getElementById('search-input').value = '';
-  document.getElementById('sort-field').classList.add('active');
-  document.getElementById('sort-city').classList.remove('active');
-  render();
-}
-
-// ─── 검색 입력 ───
-let searchTimer;
-document.getElementById('search-input').addEventListener('input', (e) => {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => {
-    state.query = e.target.value.trim();
-    render();
-  }, 180);
-});
-
-// ─── 필터링 ───
 function getFiltered() {
   let items = DATA;
+  if (state.city !== 'all') {
+    if (state.city === '경기도') {
+      items = items.filter(d => d.시군 === '경기도');
+    } else {
+      // 특정 시군 선택 시 → 해당 시군 + 경기도 광역 정책 함께 표시
+      items = items.filter(d => d.시군 === state.city || d.시군 === '경기도');
+    }
+  }
   if (state.field !== 'all') items = items.filter(d => d.분야 === state.field);
-  if (state.city !== 'all') items = items.filter(d => d.시군 === state.city);
+  if (state.statuses.size > 0) items = items.filter(d => state.statuses.has(d.모집상태 || '미정'));
   if (state.query) {
     const q = state.query.toLowerCase();
     items = items.filter(d =>
-      d.사업명.toLowerCase().includes(q) ||
-      d.주요내용.toLowerCase().includes(q) ||
-      d.시군.toLowerCase().includes(q)
+      (d.사업명||'').toLowerCase().includes(q) ||
+      (d.주요내용||'').toLowerCase().includes(q) ||
+      (d.시군||'').toLowerCase().includes(q)
     );
   }
-  // 정렬
-  const FIELD_ORDER = ['일자리','주거','교육ㆍ직업훈련','금융ㆍ복지ㆍ문화','참여권리'];
-  if (state.sort === 'field') {
-    items = [...items].sort((a, b) => FIELD_ORDER.indexOf(a.분야) - FIELD_ORDER.indexOf(b.분야));
+  const STATUS_ORDER = {'모집중':0,'모집예정':1,'미정':2,'마감':3};
+  const FIELD_ORDER  = ['일자리','주거','교육ㆍ직업훈련','금융ㆍ복지ㆍ문화','참여권리'];
+  const sort = document.getElementById('sort-select').value;
+  if (sort === 'status') {
+    items = [...items].sort((a,b) => (STATUS_ORDER[a.모집상태]??2)-(STATUS_ORDER[b.모집상태]??2));
+  } else if (sort === 'city') {
+    items = [...items].sort((a,b) => {
+      if (a.시군==='경기도' && b.시군!=='경기도') return -1;
+      if (b.시군==='경기도' && a.시군!=='경기도') return 1;
+      return a.시군.localeCompare(b.시군,'ko') || (STATUS_ORDER[a.모집상태]??2)-(STATUS_ORDER[b.모집상태]??2);
+    });
   } else {
-    items = [...items].sort((a, b) => a.시군.localeCompare(b.시군, 'ko'));
+    items = [...items].sort((a,b) => FIELD_ORDER.indexOf(a.분야)-FIELD_ORDER.indexOf(b.분야));
   }
   return items;
 }
 
-// ─── 하이라이트 ───
-function highlight(text, query) {
-  if (!query) return escapeHtml(text);
-  const escaped = escapeHtml(text);
-  const q = escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return escaped.replace(new RegExp('(' + q + ')', 'gi'), '<mark>$1</mark>');
-}
-function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ─── 렌더링 ───
 function render() {
   const items = getFiltered();
-  const grid = document.getElementById('cards-grid');
-
-  // 상단 카운트
-  document.getElementById('result-count').textContent = items.length.toLocaleString();
-  document.getElementById('h-showing').textContent = items.length.toLocaleString();
-
-  // 필터 설명
-  let desc = [];
-  if (state.city !== 'all') desc.push(state.city);
-  if (state.field !== 'all') desc.push(FIELD_LABEL[state.field] || state.field);
-  if (state.query) desc.push('"' + state.query + '"');
-  document.getElementById('filter-desc').textContent = desc.length ? '· ' + desc.join(' · ') : '';
-
+  document.getElementById('result-count').innerHTML = `<strong>${items.length}</strong>개 정책`;
   if (items.length === 0) {
-    grid.innerHTML = `<div class="no-results" style="grid-column:1/-1">
-      <div class="no-results-num">🔍</div>
-      <div class="no-results-msg">검색 결과가 없습니다.<br>다른 검색어나 필터를 사용해보세요.</div>
-    </div>`;
+    document.getElementById('cards').innerHTML = '<div class="empty"><p>조건에 맞는 정책이 없습니다.</p></div>';
     return;
   }
-
-  const q = state.query;
-  grid.innerHTML = items.map((item, i) => {
-    const fs = FIELD_STYLE[item.분야] || {};
-    const fl = FIELD_LABEL[item.분야] || item.분야;
-    const timing = item.모집시기 ? item.모집시기.replace(/\n/g,' ').substring(0,30) : '';
-    const org = item.운영기관 || '';
-    return `<div class="card" style="--card-accent:${fs.accent}" onclick="openModal(${i}, ${JSON.stringify(items.map((_,idx)=>idx).indexOf(i))})" data-idx="${i}">
-      <div class="card-header">
-        <span class="field-badge" style="color:${fs.color};background:${fs.bg}">${fl}</span>
-        <span class="city-badge">${item.시군}</span>
+  const SC = {'모집중':'ing','모집예정':'soon','마감':'done','미정':'unknown'};
+  const FC = (f) => (f||'').replace(/ㆍ/g,'').replace(/\s/g,'');
+  document.getElementById('cards').innerHTML = items.map(d => {
+    const st = d.모집상태||'미정';
+    const sc = SC[st]||'unknown';
+    const isGG = d.시군 === '경기도';
+    const recruitText = (d.모집시기||'시기 미정').replace(/\n/g,' ').substring(0,35);
+    return `<div class="card status-${sc}" onclick="openModal(${DATA.indexOf(d)})">
+      <div class="card-badges">
+        <span class="badge badge-status-${st}">${st}</span>
+        <span class="badge ${isGG?'badge-경기도':'badge-city'}">${isGG?'🌐 경기도 광역':d.시군}</span>
+        <span class="badge badge-field-${FC(d.분야)}">${d.분야||''}</span>
       </div>
-      <div class="card-title">${highlight(item.사업명, q)}</div>
-      <div class="card-meta">
-        ${timing ? `<span class="card-meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${highlight(timing, q)}</span>` : ''}
-        ${org ? `<span class="card-meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>${highlight(org.substring(0,20), q)}</span>` : ''}
+      <div class="card-title">${d.사업명||''}</div>
+      <div class="card-recruit">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span class="card-recruit-text ${sc}">${recruitText}</span>
+      </div>
+      ${d.주요내용 ? `<div class="card-summary">${(d.주요내용).substring(0,80)}...</div>` : ''}
+      <div class="card-footer">
+        <span class="card-org">${d.운영기관||d.문의처||''}</span>
+        ${d.링크 ? `<a class="card-link" href="${d.링크}" target="_blank" onclick="event.stopPropagation()">신청하기 →</a>` : ''}
       </div>
     </div>`;
   }).join('');
-
-  // 클릭 이벤트에서 인덱스 매핑 저장
-  window._currentItems = items;
 }
 
-// ─── 모달 ───
-function openModal(cardIdx) {
-  const item = window._currentItems[cardIdx];
-  currentItem = item;
-  const fs = FIELD_STYLE[item.분야] || {};
-  const fl = FIELD_LABEL[item.분야] || item.분야;
-
+function openModal(idx) {
+  const d = DATA[idx]; currentItem = d;
+  const st = d.모집상태||'미정';
+  const sc = {'모집중':'ing','모집예정':'soon','마감':'done','미정':'unknown'}[st]||'unknown';
+  const FC = (f) => (f||'').replace(/ㆍ/g,'').replace(/\s/g,'');
+  const isGG = d.시군 === '경기도';
   document.getElementById('modal-badges').innerHTML =
-    `<span class="field-badge" style="color:${fs.color};background:${fs.bg};font-size:12px;padding:3px 10px">${fl}</span>
-     <span class="city-badge">${item.시군}</span>`;
-  document.getElementById('modal-title').textContent = item.사업명;
-  document.getElementById('modal-content').textContent = item.주요내용 || '내용 없음';
-
-  // 메타 정보
-  const metaItems = [
-    item.모집시기 ? { key: '모집 시기', val: item.모집시기, full: false } : null,
-    item.운영기관 ? { key: '운영 기관', val: item.운영기관, full: false } : null,
-    item.문의처 ? { key: '문의처', val: item.문의처, full: true } : null,
-    item.신청방법 ? { key: '신청 방법', val: item.링크 ? item.신청방법.substring(0, 120) + (item.신청방법.length > 120 ? '…' : '') : item.신청방법.substring(0, 120), full: true } : null,
-  ].filter(Boolean);
-
-  document.getElementById('modal-meta').innerHTML = metaItems.map(m =>
-    `<div class="modal-meta-cell${m.full ? ' full' : ''}">
-      <div class="modal-meta-key">${m.key}</div>
-      <div class="modal-meta-val">${escapeHtml(m.val)}</div>
-    </div>`
-  ).join('');
-
-  // 액션 버튼
-  let actions = `<button class="btn-close" onclick="closeModal()">닫기</button>`;
-  if (item.문의처) {
-    actions += `<button class="btn-copy" onclick="copyContact()">문의처 복사</button>`;
-  }
-  if (item.링크) {
-    actions += `<a class="btn-link" href="${escapeHtml(item.링크)}" target="_blank" rel="noopener">신청 바로가기 ↗</a>`;
-  }
-  document.getElementById('modal-actions').innerHTML = actions;
-
-  document.getElementById('modal-overlay').classList.add('open');
+    `<span class="badge badge-status-${st}">${st}</span>
+     <span class="badge ${isGG?'badge-경기도':'badge-city'}">${isGG?'🌐 경기도 광역':d.시군}</span>
+     <span class="badge badge-field-${FC(d.분야)}">${d.분야||''}</span>`;
+  document.getElementById('modal-title').textContent = d.사업명||'';
+  document.getElementById('modal-content').textContent = d.주요내용||'-';
+  document.getElementById('modal-info').innerHTML = `
+    <div class="modal-item"><div class="modal-item-label">📅 모집시기</div><div class="modal-item-value ${sc}">${d.모집시기||'미정'}</div></div>
+    <div class="modal-item"><div class="modal-item-label">📝 신청방법</div><div class="modal-item-value">${d.신청방법||'-'}</div></div>
+    <div class="modal-item"><div class="modal-item-label">🏢 운영기관</div><div class="modal-item-value">${d.운영기관||'-'}</div></div>
+    <div class="modal-item"><div class="modal-item-label">📞 문의처</div><div class="modal-item-value">${d.문의처||'-'}</div></div>`;
+  document.getElementById('btn-link').style.display = d.링크 ? '' : 'none';
+  document.getElementById('overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
 
 function closeModal(e) {
-  if (e && e.target !== document.getElementById('modal-overlay')) return;
-  document.getElementById('modal-overlay').classList.remove('open');
+  if (e && e.target !== document.getElementById('overlay')) return;
+  document.getElementById('overlay').classList.remove('open');
   document.body.style.overflow = '';
 }
 
 function copyContact() {
   if (!currentItem) return;
-  const text = currentItem.문의처;
+  const text = `[${currentItem.사업명}]\n문의처: ${currentItem.문의처||'-'}\n신청방법: ${currentItem.신청방법||'-'}`;
   navigator.clipboard.writeText(text).then(() => {
-    const btn = document.querySelector('.btn-copy');
-    btn.textContent = '복사 완료 ✓';
-    setTimeout(() => { btn.textContent = '문의처 복사'; }, 1500);
-  }).catch(() => {
-    prompt('문의처를 복사하세요:', text);
+    const btn = document.getElementById('btn-copy');
+    btn.textContent = '✅ 복사됨!';
+    setTimeout(()=>{ btn.textContent='📋 문의처 복사'; }, 2000);
   });
 }
 
-// ESC로 모달 닫기
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
-});
+function openLink() { if (currentItem?.링크) window.open(currentItem.링크, '_blank'); }
 
+function toggleStatus(status, el) {
+  if (state.statuses.has(status)) {
+    if (state.statuses.size === 1) return;
+    state.statuses.delete(status); el.classList.remove('active');
+  } else { state.statuses.add(status); el.classList.add('active'); }
+  render();
+}
+function setCity(city, el) {
+  state.city = city;
+  document.querySelectorAll('[data-city]').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active'); render();
+}
+function setField(field, el) {
+  state.field = field;
+  document.querySelectorAll('[data-field]').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active'); render();
+}
+document.getElementById('search').addEventListener('input', e => { state.query=e.target.value.trim(); render(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
 </script>
 </body>
 </html>
