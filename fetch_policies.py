@@ -198,6 +198,12 @@ def main():
         updated.extend(new_items)
         print(f"온통청년 API 신규: {len(new_items)}개")
 
+    # 31개 시군 공고 게시판 크롤링
+    print("\n31개 시군 공고 게시판 크롤링...")
+    sigungu_new = scrape_sigungu_boards(updated)
+    updated.extend(sigungu_new)
+    print(f"시군 공고 신규 발견: {len(sigungu_new)}개")
+
     # 경기도 전용 포털 크롤링 (청년기본소득, 고립은둔 등)
     print("\n경기도 전용 포털 크롤링...")
     existing_names = {d.get("사업명", "") for d in updated}
@@ -228,6 +234,91 @@ def main():
 
 # ── 경기도 전용 포털 크롤링 ─────────────────────────────────
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+def scrape_sigungu_boards(existing_data):
+    """31개 시군 공고 게시판 크롤링 → 청년 관련 신규 공고 감지"""
+    try:
+        with open("sites.json", "r", encoding="utf-8") as f:
+            sites = json.load(f)
+    except:
+        print("  sites.json 없음")
+        return []
+
+    # 기존 사업명 목록 (중복 방지)
+    existing_names = {d.get("사업명","") for d in existing_data}
+    # 기존 링크 목록 (같은 공고 중복 방지)
+    existing_links = {d.get("링크","") for d in existing_data if d.get("링크")}
+
+    YOUTH_KEYWORDS = ["청년", "청소년지원", "청년지원", "청년정책", "청년취업",
+                      "청년주거", "청년창업", "청년인턴", "청년아르바이트"]
+    results = []
+
+    for site in sites:
+        시군 = site.get("city") or site.get("시군", "")
+        url  = site["url"]
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=10)
+            r.encoding = r.apparent_encoding or "utf-8"
+            soup = BeautifulSoup(r.text, "html.parser")
+
+            # 여러 셀렉터 시도
+            rows = []
+            for sel in site.get("selectors", ["table tr"]):
+                rows = soup.select(sel)
+                if len(rows) > 2:
+                    break
+
+            for row in rows:
+                # 제목 텍스트와 링크 추출
+                link_el = row.select_one("a")
+                if not link_el:
+                    continue
+                title = link_el.get_text(strip=True)
+                if not title or len(title) < 4:
+                    continue
+
+                # 청년 키워드 포함 여부 체크
+                if not any(kw in title for kw in YOUTH_KEYWORDS):
+                    continue
+
+                href = link_el.get("href", "")
+                full_link = href if href.startswith("http") else (
+                    f"https://{url.split('/')[2]}{href}" if href.startswith("/") else url
+                )
+
+                # 중복 체크
+                if full_link in existing_links:
+                    continue
+                if any(title in name or name in title for name in existing_names if len(name) > 4):
+                    # 기존 사업명과 유사 → 모집중으로 상태만 업데이트
+                    for d in existing_data:
+                        if d.get("시군") == 시군 and (
+                            title in d.get("사업명","") or d.get("사업명","") in title
+                        ):
+                            if d.get("모집상태") != "모집중":
+                                d["모집상태"] = "모집중"
+                                d["링크_모집"] = full_link
+                                d["링크"] = full_link
+                                print(f"  ✅ 상태 업데이트: [{시군}] {d['사업명']} → 모집중")
+                    continue
+
+                # 신규 공고 → 새 항목 추가
+                results.append({
+                    "시군": 시군, "분야": "기타",
+                    "사업명": title, "주요내용": "",
+                    "모집시기": "", "모집상태": "모집중",
+                    "신청방법": "", "운영기관": "", "문의처": "",
+                    "링크": full_link, "링크_모집": full_link, "링크_전년도": "",
+                    "출처": f"{시군}공고게시판", "갱신일": TODAY.strftime("%Y-%m-%d"),
+                })
+                existing_links.add(full_link)
+                print(f"  🆕 신규 공고: [{시군}] {title}")
+
+        except Exception as e:
+            print(f"  ⚠️ [{시군}] 크롤링 실패: {type(e).__name__}")
+
+    return results
+
 
 def scrape_gyeonggi_youth_portal():
     """경기청년포털 youth.gg.go.kr - 청년기본소득, 갭이어, 사다리 등"""
