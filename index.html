@@ -112,6 +112,18 @@ html { overflow-x: hidden; }
 }
 .filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .filter-label { font-size: 11px; font-weight: 600; color: var(--text2); min-width: 40px; }
+
+/* 지역 드롭다운 */
+.city-select {
+  appearance: none; -webkit-appearance: none;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 6px 32px 6px 12px; font-size: 13px; font-family: inherit;
+  background: var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;
+  cursor: pointer; color: var(--text); outline: none;
+  transition: border-color .15s; min-width: 140px;
+}
+.city-select:focus { border-color: var(--accent); }
+.city-select.has-value { border-color: var(--accent); color: var(--accent); font-weight: 600; background-color: var(--accent-light); }
 .search-box {
   display: flex; align-items: center; gap: 6px;
   border: 1.5px solid var(--border); border-radius: 8px;
@@ -279,6 +291,7 @@ html { overflow-x: hidden; }
   .card-title { word-break: keep-all; }
   .card-org, .card-recruit-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
   .card-footer { overflow: hidden; }
+  .city-select { min-width: 120px; font-size: 12px; }
   .result-bar { margin-bottom: 10px; }
 
   /* 카드 모바일 */
@@ -357,7 +370,10 @@ html { overflow-x: hidden; }
     </div>
     <div class="filter-row">
       <span class="filter-label">지역</span>
-      <div id="city-chips" style="display:flex;gap:6px;flex-wrap:nowrap;"></div>
+      <select class="city-select" id="city-select" onchange="setCity(this.value, this)">
+        <option value="all">전체 지역</option>
+        <option value="경기도">🌐 경기도 광역</option>
+      </select>
     </div>
     <div class="filter-row">
       <span class="filter-label">분야</span>
@@ -494,11 +510,12 @@ fetch('data.json')
 
 function buildCityChips() {
   const sigungu = [...new Set(DATA.filter(d=>d.시군!=='경기도').map(d=>d.시군))].sort((a,b)=>a.localeCompare(b,'ko'));
-  const cities = ['all', '경기도', ...sigungu];
-  document.getElementById('city-chips').innerHTML = cities.map(c => {
-    const label = c==='all' ? '전체' : c==='경기도' ? '🌐 경기도 전체' : c;
-    return `<div class="chip ${c==='all'?'active':''}" data-city="${c}" onclick="setCity('${c}',this)">${label}</div>`;
-  }).join('');
+  const sel = document.getElementById('city-select');
+  sigungu.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    sel.appendChild(opt);
+  });
 }
 
 function getFiltered() {
@@ -667,8 +684,10 @@ function toggleStatus(status, el) {
 }
 function setCity(city, el) {
   state.city = city;
-  document.querySelectorAll('[data-city]').forEach(c=>c.classList.remove('active'));
-  el.classList.add('active'); render();
+  const sel = document.getElementById('city-select');
+  sel.value = city;
+  sel.className = city === 'all' ? 'city-select' : 'city-select has-value';
+  render();
 }
 function setField(field, el) {
   state.field = field;

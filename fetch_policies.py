@@ -1,8 +1,9 @@
 """
-온통청년 API + 경기도 전용 포털 자동 갱신
+온통청년 API + 경기도 전용 포털 + 네이버 뉴스 RSS 자동 갱신
 - 온통청년 API (중앙·광역 정책)
 - 경기청년포털 youth.gg.go.kr (경기도 청년정책)
 - 잡아바 apply.jobaba.net (경기도일자리재단 - 청년기본소득 등)
+- 네이버 뉴스 RSS (경기도/31개 시군 청년정책 신규 공고 감지)
 - 경기복지포털 gg24.gg.go.kr (고립은둔 등 복지사업)
 매일 GitHub Actions에서 실행됩니다.
 """
@@ -220,6 +221,18 @@ def main():
             existing_names.add(item["사업명"])
             added += 1
     print(f"경기도 포털 신규 추가: {added}개")
+
+    # 네이버 뉴스 RSS 검색
+    print("\n네이버 뉴스 RSS 청년정책 신규 공고 탐지...")
+    news_items = search_naver_news(updated)
+    news_added = 0
+    existing_names_now = {d.get("사업명","") for d in updated}
+    for item in news_items:
+        if item["사업명"] not in existing_names_now and len(item["사업명"]) > 5:
+            updated.append(item)
+            existing_names_now.add(item["사업명"])
+            news_added += 1
+    print(f"뉴스 신규 추가: {news_added}개")
 
     # 최종 저장
     with open("data.json", "w", encoding="utf-8") as f:
@@ -456,6 +469,96 @@ def scrape_gg24():
                 "출처": "경기복지포털", "갱신일": TODAY.strftime("%Y-%m-%d"),
             })
     return results
+
+
+# ── 네이버 뉴스 RSS 검색 ─────────────────────────────────────
+import urllib.parse
+from xml.etree import ElementTree as ET2
+
+NAVER_SEARCH_QUERIES = [
+    "경기도 청년 모집 공고",
+    "경기도 청년정책 신청",
+    "경기 청년 지원 모집",
+    "수원시 청년 모집",
+    "성남시 청년 모집",
+    "용인시 청년 모집",
+    "고양시 청년 모집",
+    "화성시 청년 모집",
+    "경기청년 새소식",
+]
+
+YOUTH_KEYWORDS = ["청년", "청년정책", "청년지원", "청년모집", "청년공고"]
+EXCLUDE_KEYWORDS = ["부동산", "주식", "투자", "광고", "대출금리"]
+
+GYEONGGI_CITIES = ["수원","성남","의정부","안양","부천","광명","평택","동두천","안산",
+                   "고양","과천","구리","남양주","오산","시흥","군포","의왕","하남",
+                   "용인","파주","이천","안성","김포","화성","광주","양주","포천",
+                   "여주","연천","가평","양평","경기"]
+
+def search_naver_news(existing_data):
+    """네이버 뉴스 RSS로 경기도 청년정책 신규 공고 탐지"""
+    existing_names = {d.get("사업명","") for d in existing_data}
+    existing_links = {d.get("링크","") for d in existing_data if d.get("링크")}
+    results = []
+    seen_links = set()
+
+    for query in NAVER_SEARCH_QUERIES:
+        try:
+            encoded = urllib.parse.quote(query)
+            rss_url = f"https://news.naver.com/main/rss/rss.naver?oid=&q={encoded}&sort=1&period=1"
+            # 네이버 뉴스 검색 RSS (최근 1일)
+            search_url = f"https://s.search.naver.com/p/newssearch/search.naver?query={encoded}&where=news&pd=4&ds=&de=&docid=&related=0&mynews=0&office_type=0&office_section_code=0&news_office_checked=&sort=1&field=0&service_area=0&start=1&display=10&format=rss"
+            r = requests.get(search_url, headers={**HEADERS, "Referer": "https://search.naver.com"}, timeout=10)
+            root = ET2.fromstring(r.content)
+
+            for item in root.findall(".//item"):
+                title_el = item.find("title")
+                link_el  = item.find("link")
+                desc_el  = item.find("description")
+                if title_el is None: continue
+
+                title = re.sub(r'<[^>]+>', '', title_el.text or "").strip()
+                link  = link_el.text.strip() if link_el is not None and link_el.text else ""
+                desc  = re.sub(r'<[^>]+>', '', desc_el.text or "").strip() if desc_el is not None else ""
+
+                # 필터링
+                if not any(kw in title for kw in YOUTH_KEYWORDS): continue
+                if any(ex in title for ex in EXCLUDE_KEYWORDS): continue
+                if not any(city in title+desc for city in GYEONGGI_CITIES): continue
+                if link in seen_links or link in existing_links: continue
+                if any(title[:10] in name for name in existing_names): continue
+
+                seen_links.add(link)
+
+                # 시군 추출
+                시군 = "경기도"
+                for city in GYEONGGI_CITIES:
+                    if city in title and city != "경기":
+                        시군 = city + ("시" if not city.endswith(("시","군")) else "")
+                        break
+
+                results.append({
+                    "시군": 시군, "분야": "기타",
+                    "사업명": title[:60],
+                    "주요내용": desc[:200],
+                    "모집시기": "", "모집상태": "확인필요",
+                    "신청방법": "", "운영기관": "",
+                    "문의처": "", "링크": link,
+                    "링크_모집": link, "링크_전년도": "",
+                    "출처": "네이버뉴스RSS",
+                    "갱신일": TODAY.strftime("%Y-%m-%d"),
+                    "메모": f"뉴스 자동감지 - 담당자 확인 필요: {link}"
+                })
+                print(f"  📰 뉴스 감지: {title[:40]}")
+
+        except Exception as e:
+            print(f"  네이버 RSS 오류 ({query[:10]}): {type(e).__name__}")
+        time.sleep(0.5)
+
+    print(f"네이버 뉴스 신규 감지: {len(results)}건")
+    return results
+
+import time
 
 
 if __name__ == "__main__":
