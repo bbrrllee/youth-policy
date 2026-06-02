@@ -105,6 +105,10 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
   padding: 12px 20px; display: flex; flex-direction: column; gap: 10px;
   position: sticky; top: 49px; z-index: 150;
 }
+/* 모바일에서 헤더 높이 달라지므로 top 조정 */
+@media (max-width: 480px) {
+  .filterbar { top: 0; }
+}
 .filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .filter-label { font-size: 11px; font-weight: 600; color: var(--text2); min-width: 40px; }
 .search-box {
@@ -226,10 +230,78 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
 .empty { text-align: center; padding: 60px 20px; color: var(--text3); }
 .loading { text-align: center; padding: 80px 20px; color: var(--text3); }
 
-@media (max-width: 600px) {
-  .header-counts { display: none; }
-  .cards { grid-template-columns: 1fr; }
+/* ── 필터 토글 버튼 ── */
+.filter-toggle-btn {
+  display: none;
+  width: 100%; padding: 8px 14px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; font-size: 13px; font-weight: 600;
+  font-family: inherit; cursor: pointer; color: var(--text2);
+  text-align: left; margin-bottom: 2px;
+  justify-content: space-between; align-items: center;
+}
+.filter-toggle-btn .arrow { transition: transform .2s; }
+.filter-rows-wrap { display: flex; flex-direction: column; gap: 10px; }
+
+/* ── 태블릿 (768px 이하) ── */
+@media (max-width: 768px) {
+  .header { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
+  .header-title { font-size: 14px; }
+  .header-date { font-size: 11px; }
+  .header-btns { gap: 6px; }
+  .header-btn { padding: 5px 10px; font-size: 11px; }
+  .header-counts { gap: 10px; font-size: 11px; }
+
+  .filterbar { padding: 10px 14px; gap: 8px; top: auto; position: relative; }
+  .filter-toggle-btn { display: flex; }
+
+  /* 필터 행 가로 스크롤 */
+  .filter-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .filter-label { min-width: 36px; font-size: 10px; }
+  .chip { font-size: 11px; padding: 4px 10px; white-space: nowrap; }
+  .search-box { max-width: 100%; }
+
+  /* 접힌 상태 */
+  .filter-rows-wrap.collapsed { display: none; }
+  .filter-toggle-btn.open .arrow { transform: rotate(180deg); }
+
+  .main { padding: 10px 14px; }
+  .cards { grid-template-columns: 1fr; gap: 10px; }
+  .result-bar { margin-bottom: 10px; }
+
+  /* 카드 모바일 */
+  .card { padding: 12px; gap: 8px; }
+  .card-title { font-size: 13px; }
+  .badge { font-size: 10px; padding: 2px 6px; }
+
+  /* 모달 모바일 */
+  .overlay { padding: 0; align-items: flex-end; }
+  .modal {
+    max-width: 100%; border-radius: 16px 16px 0 0;
+    max-height: 90vh;
+  }
   .modal-grid { grid-template-columns: 1fr; }
+  .modal-footer { flex-wrap: wrap; }
+  .modal-footer .btn { flex: none; width: 100%; }
+
+  /* 팝업 모바일 */
+  .popup-box { max-width: 100%; margin: 10px; }
+}
+
+/* ── 스마트폰 (480px 이하) ── */
+@media (max-width: 480px) {
+  .header-date { display: none; }
+  .header-counts { display: none; }
+  .hstat-label { display: none; }
+  .header-btns { order: 3; width: 100%; }
+  .header-btn { flex: 1; text-align: center; }
 }
 </style>
 </head>
@@ -253,33 +325,44 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
 </header>
 
 <div class="filterbar">
+  <!-- 검색: 항상 노출 -->
   <div class="filter-row">
     <div class="search-box">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input type="text" id="search" placeholder="사업명, 내용으로 검색..." autocomplete="off">
     </div>
   </div>
-  <div class="filter-row">
-    <span class="filter-label">상태</span>
-    <div class="chip active" id="chip-all-status" onclick="setAllStatus(this)">전체</div>
-    <div class="chip status-check" data-status="확인필요" onclick="toggleStatus('확인필요',this)">🔴 확인필요</div>
-    <div class="chip status-ing" data-status="모집중" onclick="toggleStatus('모집중',this)">🟢 모집중</div>
-    <div class="chip status-soon" data-status="모집예정" onclick="toggleStatus('모집예정',this)">🟡 모집예정</div>
-    <div class="chip status-unknown" data-status="미정" onclick="toggleStatus('미정',this)">⚪ 미정</div>
-    <div class="chip status-done" data-status="마감" onclick="toggleStatus('마감',this)">⚫ 마감</div>
-  </div>
-  <div class="filter-row">
-    <span class="filter-label">지역</span>
-    <div id="city-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
-  </div>
-  <div class="filter-row">
-    <span class="filter-label">분야</span>
-    <div class="chip active" data-field="all" onclick="setField('all',this)">전체</div>
-    <div class="chip" data-field="일자리" onclick="setField('일자리',this)">💼 일자리</div>
-    <div class="chip" data-field="주거" onclick="setField('주거',this)">🏠 주거</div>
-    <div class="chip" data-field="교육ㆍ직업훈련" onclick="setField('교육ㆍ직업훈련',this)">📚 교육</div>
-    <div class="chip" data-field="금융ㆍ복지ㆍ문화" onclick="setField('금융ㆍ복지ㆍ문화',this)">💰 금융·복지</div>
-    <div class="chip" data-field="참여권리" onclick="setField('참여권리',this)">🤝 참여권리</div>
+
+  <!-- 필터 토글 버튼 (모바일에서만 표시) -->
+  <button class="filter-toggle-btn" id="filter-toggle" onclick="toggleFilterPanel()">
+    <span>🔍 필터 선택 (상태 · 지역 · 분야)</span>
+    <span class="arrow">▼</span>
+  </button>
+
+  <!-- 필터 행들 -->
+  <div class="filter-rows-wrap collapsed" id="filter-rows-wrap">
+    <div class="filter-row">
+      <span class="filter-label">상태</span>
+      <div class="chip active" id="chip-all-status" onclick="setAllStatus(this)">전체</div>
+      <div class="chip status-check" data-status="확인필요" onclick="toggleStatus('확인필요',this)">🔴 확인필요</div>
+      <div class="chip status-ing" data-status="모집중" onclick="toggleStatus('모집중',this)">🟢 모집중</div>
+      <div class="chip status-soon" data-status="모집예정" onclick="toggleStatus('모집예정',this)">🟡 모집예정</div>
+      <div class="chip status-unknown" data-status="미정" onclick="toggleStatus('미정',this)">⚪ 미정</div>
+      <div class="chip status-done" data-status="마감" onclick="toggleStatus('마감',this)">⚫ 마감</div>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">지역</span>
+      <div id="city-chips" style="display:flex;gap:6px;flex-wrap:nowrap;"></div>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">분야</span>
+      <div class="chip active" data-field="all" onclick="setField('all',this)">전체</div>
+      <div class="chip" data-field="일자리" onclick="setField('일자리',this)">💼 일자리</div>
+      <div class="chip" data-field="주거" onclick="setField('주거',this)">🏠 주거</div>
+      <div class="chip" data-field="교육ㆍ직업훈련" onclick="setField('교육ㆍ직업훈련',this)">📚 교육</div>
+      <div class="chip" data-field="금융ㆍ복지ㆍ문화" onclick="setField('금융ㆍ복지ㆍ문화',this)">💰 금융·복지</div>
+      <div class="chip" data-field="참여권리" onclick="setField('참여권리',this)">🤝 참여권리</div>
+    </div>
   </div>
 </div>
 
@@ -589,6 +672,28 @@ function setField(field, el) {
 }
 document.getElementById('search').addEventListener('input', e => { state.query=e.target.value.trim(); render(); });
 document.addEventListener('keydown', e => { if(e.key==='Escape') { closeModal(); closePopup('contact'); closePopup('report'); } });
+
+// ── 필터 패널 토글 ──
+function toggleFilterPanel() {
+  const wrap = document.getElementById('filter-rows-wrap');
+  const btn  = document.getElementById('filter-toggle');
+  wrap.classList.toggle('collapsed');
+  btn.classList.toggle('open');
+}
+
+// 데스크탑에서는 필터 항상 펼침
+function handleResize() {
+  const wrap = document.getElementById('filter-rows-wrap');
+  const btn  = document.getElementById('filter-toggle');
+  if (window.innerWidth > 768) {
+    wrap.classList.remove('collapsed');
+    btn.classList.remove('open');
+  } else {
+    // 모바일 진입 시 기본 접힘 유지 (처음 한 번만)
+  }
+}
+window.addEventListener('resize', handleResize);
+handleResize(); // 초기 실행
 
 // ── 팝업 공통 ──
 function openPopup(id) {
