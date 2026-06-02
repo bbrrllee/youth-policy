@@ -17,7 +17,8 @@
   --unknown: #6366F1; --unknown-bg: #EEF2FF; --unknown-bd: #C7D2FE;
   --check: #DC2626; --check-bg: #FFF1F2; --check-bd: #FECDD3;
 }
-body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; overflow-x: hidden; }
+html { overflow-x: hidden; }
 
 .header {
   background: var(--accent); color: #fff; padding: 14px 20px;
@@ -272,8 +273,12 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
   .filter-rows-wrap.collapsed { display: none; }
   .filter-toggle-btn.open .arrow { transform: rotate(180deg); }
 
-  .main { padding: 10px 14px; }
-  .cards { grid-template-columns: 1fr; gap: 10px; }
+  .main { padding: 10px 14px; width: 100%; box-sizing: border-box; }
+  .cards { grid-template-columns: 1fr; gap: 10px; width: 100%; }
+  .card { width: 100%; min-width: 0; box-sizing: border-box; }
+  .card-title { word-break: keep-all; }
+  .card-org, .card-recruit-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .card-footer { overflow: hidden; }
   .result-bar { margin-bottom: 10px; }
 
   /* 카드 모바일 */
