@@ -32,7 +32,12 @@ except ImportError:
 
 # ── 상수 ────────────────────────────────────────────────────
 API_KEY  = os.environ.get("API_KEY", "c937731f-99f2-489c-a334-07bbfff0da0d")
-BASE_URL = "https://www.youthcenter.go.kr/opi/youthPlcyList.do"
+# 구 API URL이 다운된 경우를 대비해 복수 엔드포인트 시도
+BASE_URLS = [
+    "https://www.youthcenter.go.kr/opi/youthPlcyList.do",
+    "https://youth.go.kr/opi/youthPlcyList.do",
+]
+BASE_URL = BASE_URLS[0]
 TODAY    = datetime.now()
 CUR_M    = TODAY.month
 HEADERS  = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -106,13 +111,20 @@ def fetch_api_page(page=1, per_page=100, keyword=""):
     }
     if keyword:
         params["query"] = keyword
-    try:
-        r = requests.get(BASE_URL, params=params, timeout=20)
-        r.encoding = "utf-8"
-        return ET.fromstring(r.text)
-    except Exception as e:
-        print(f"  API 오류: {e}")
-        return None
+    for url in BASE_URLS:
+        try:
+            r = requests.get(url, params=params, timeout=20, allow_redirects=False)
+            if r.status_code in (301, 302, 303):
+                print(f"  API 리다이렉트 ({r.status_code}): {url} → 다음 엔드포인트 시도")
+                continue
+            r.encoding = "utf-8"
+            root = ET.fromstring(r.text)
+            if root.find(".//youthPolicy") is not None or root.findtext(".//totalCount"):
+                return root
+        except Exception as e:
+            print(f"  API 오류 ({url}): {e}")
+    print("  ⚠️ 모든 API 엔드포인트 실패")
+    return None
 
 def parse_api_item(item):
     ssg = item.findtext("ssgNm", "")
@@ -495,6 +507,13 @@ def main():
 
     print("\n네이버 뉴스 RSS...")
     add_new(search_naver_news(updated), "네이버뉴스")
+
+    # 안전 장치: 기존 데이터보다 현저히 적으면 저장 중단
+    MIN_ITEMS = 10
+    if len(existing) >= MIN_ITEMS and len(updated) < len(existing) * 0.5:
+        print(f"\n⚠️ 안전 중단: 기존 {len(existing)}개 → 수집 {len(updated)}개 (50% 미만)")
+        print("  data.json을 덮어쓰지 않습니다. API/스크래핑 오류를 확인하세요.")
+        return
 
     # 저장
     with open("data.json","w",encoding="utf-8") as f:
