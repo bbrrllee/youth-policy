@@ -180,11 +180,13 @@ html { overflow-x: hidden; }
 .badge-status-확인필요 { background: var(--check-bg);  color: var(--check);   border: 1px solid var(--check-bd); font-weight:700; }
 .badge-city { background: #F3F4F6; color: #374151; border: 1px solid #E5E7EB; }
 .badge-경기도 { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; font-weight:700; }
+.badge-field-청년정책 { background: #F0F9FF; color: #0369A1; border: 1px solid #BAE6FD; }
+.badge-field-창업 { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
 .badge-field-일자리 { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
-.badge-field-주거 { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
 .badge-field-교육직업훈련 { background: #F5F3FF; color: #6D28D9; border: 1px solid #DDD6FE; }
+.badge-field-주거 { background: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; }
 .badge-field-금융복지문화 { background: #F0FDFA; color: #0F766E; border: 1px solid #99F6E4; }
-.badge-field-참여권리 { background: #FFF1F2; color: #BE123C; border: 1px solid #FECDD3; }
+.badge-field-참여기반 { background: #FFF1F2; color: #BE123C; border: 1px solid #FECDD3; }
 
 .card-title { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .card-recruit { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
@@ -378,11 +380,13 @@ html { overflow-x: hidden; }
     <div class="filter-row">
       <span class="filter-label">분야</span>
       <div class="chip active" data-field="all" onclick="setField('all',this)">전체</div>
+      <div class="chip" data-field="청년정책" onclick="setField('청년정책',this)">🎯 청년정책</div>
+      <div class="chip" data-field="창업" onclick="setField('창업',this)">🚀 창업</div>
       <div class="chip" data-field="일자리" onclick="setField('일자리',this)">💼 일자리</div>
+      <div class="chip" data-field="교육·직업훈련" onclick="setField('교육·직업훈련',this)">📚 교육</div>
       <div class="chip" data-field="주거" onclick="setField('주거',this)">🏠 주거</div>
-      <div class="chip" data-field="교육ㆍ직업훈련" onclick="setField('교육ㆍ직업훈련',this)">📚 교육</div>
-      <div class="chip" data-field="금융ㆍ복지ㆍ문화" onclick="setField('금융ㆍ복지ㆍ문화',this)">💰 금융·복지</div>
-      <div class="chip" data-field="참여권리" onclick="setField('참여권리',this)">🤝 참여권리</div>
+      <div class="chip" data-field="금융·복지·문화" onclick="setField('금융·복지·문화',this)">💰 금융·복지</div>
+      <div class="chip" data-field="참여·기반" onclick="setField('참여·기반',this)">🤝 참여·기반</div>
     </div>
   </div>
 </div>
@@ -539,7 +543,7 @@ function getFiltered() {
     );
   }
   const STATUS_ORDER = {'모집중':0,'확인필요':1,'모집예정':2,'미정':3,'마감':4};
-  const FIELD_ORDER  = ['일자리','주거','교육ㆍ직업훈련','금융ㆍ복지ㆍ문화','참여권리'];
+  const FIELD_ORDER  = ['청년정책','창업','일자리','교육·직업훈련','주거','금융·복지·문화','참여·기반'];
   const sort = document.getElementById('sort-select').value;
   // 모집상태순은 항상 1차 정렬 기준
   // 경기도 광역 먼저, 그 다음 모집상태순
@@ -576,7 +580,7 @@ function render() {
     return;
   }
   const SC = {'확인필요':'check','모집중':'ing','모집예정':'soon','마감':'done','미정':'unknown'};
-  const FC = (f) => (f||'').replace(/ㆍ/g,'').replace(/\s/g,'');
+  const FC = (f) => (f||'').replace(/[ㆍ·]/g,'').replace(/\s/g,'');
   document.getElementById('cards').innerHTML = items.map(d => {
     const st = d.모집상태||'미정';
     const sc = SC[st]||'unknown';
@@ -609,7 +613,7 @@ function openModal(idx) {
   const d = DATA[idx]; currentItem = d;
   const st = d.모집상태||'미정';
   const sc = {'확인필요':'check','모집중':'ing','모집예정':'soon','마감':'done','미정':'unknown'}[st]||'unknown';
-  const FC = (f) => (f||'').replace(/ㆍ/g,'').replace(/\s/g,'');
+  const FC = (f) => (f||'').replace(/[ㆍ·]/g,'').replace(/\s/g,'');
   const isGG = d.시군 === '경기도';
   document.getElementById('modal-badges').innerHTML =
     `<span class="badge badge-status-${st}">${st}</span>
