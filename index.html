@@ -179,7 +179,8 @@ html { overflow-x: hidden; }
 .badge-status-미정     { background: var(--unknown-bg); color: var(--unknown); border: 1px solid var(--unknown-bd); }
 .badge-status-확인필요 { background: var(--check-bg);  color: var(--check);   border: 1px solid var(--check-bd); font-weight:700; }
 .badge-city { background: #F3F4F6; color: #374151; border: 1px solid #E5E7EB; }
-.badge-경기도 { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; font-weight:700; }
+.badge-경기도 { background: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE; font-weight:700; }
+.badge-중앙정부 { background: #FFF1F2; color: #BE123C; border: 1px solid #FECDD3; font-weight:700; }
 .badge-field-청년정책 { background: #F0F9FF; color: #0369A1; border: 1px solid #BAE6FD; }
 .badge-field-창업 { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
 .badge-field-일자리 { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
@@ -374,7 +375,8 @@ html { overflow-x: hidden; }
       <span class="filter-label">지역</span>
       <select class="city-select" id="city-select" onchange="setCity(this.value, this)">
         <option value="all">전체 지역</option>
-        <option value="경기도">🌐 경기도 광역</option>
+        <option value="중앙정부">❤️ 중앙정부</option>
+        <option value="경기도">💙 경기도 광역</option>
       </select>
     </div>
     <div class="filter-row">
@@ -513,7 +515,7 @@ fetch('data.json')
   });
 
 function buildCityChips() {
-  const sigungu = [...new Set(DATA.filter(d=>d.시군!=='경기도').map(d=>d.시군))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const sigungu = [...new Set(DATA.filter(d=>d.시군!=='경기도'&&d.시군!=='중앙정부').map(d=>d.시군))].sort((a,b)=>a.localeCompare(b,'ko'));
   const sel = document.getElementById('city-select');
   sigungu.forEach(c => {
     const opt = document.createElement('option');
@@ -525,7 +527,9 @@ function buildCityChips() {
 function getFiltered() {
   let items = DATA;
   if (state.city !== 'all') {
-    if (state.city === '경기도') {
+    if (state.city === '중앙정부') {
+      items = items.filter(d => d.시군 === '중앙정부');
+    } else if (state.city === '경기도') {
       items = items.filter(d => d.시군 === '경기도');
     } else {
       // 특정 시군 선택 시 → 해당 시군 + 경기도 광역 정책 함께 표시
@@ -583,11 +587,14 @@ function render() {
     const st = d.모집상태||'미정';
     const sc = SC[st]||'unknown';
     const isGG = d.시군 === '경기도';
+    const isGov = d.시군 === '중앙정부';
+    const cityLabel = isGov ? '❤️ 중앙정부' : isGG ? '💙 경기도 광역' : d.시군;
+    const cityBadge = isGov ? 'badge-중앙정부' : isGG ? 'badge-경기도' : 'badge-city';
     const recruitText = (d.모집시기||'시기 미정').replace(/\n/g,' ').substring(0,35);
     return `<div class="card status-${sc}" onclick="openModal(${DATA.indexOf(d)})">
       <div class="card-badges">
         <span class="badge badge-status-${st}">${st}</span>
-        <span class="badge ${isGG?'badge-경기도':'badge-city'}">${isGG?'🌐 경기도 광역':d.시군}</span>
+        <span class="badge ${cityBadge}">${cityLabel}</span>
         <span class="badge badge-field-${FC(d.분야)}">${d.분야||''}</span>
       </div>
       <div class="card-title">${d.사업명||''}</div>
@@ -613,9 +620,12 @@ function openModal(idx) {
   const sc = {'확인필요':'check','모집중':'ing','모집예정':'soon','마감':'done','미정':'unknown'}[st]||'unknown';
   const FC = (f) => (f||'').replace(/[ㆍ·]/g,'').replace(/\s/g,'');
   const isGG = d.시군 === '경기도';
+  const isGov = d.시군 === '중앙정부';
+  const cityLabel = isGov ? '❤️ 중앙정부' : isGG ? '💙 경기도 광역' : d.시군;
+  const cityBadge = isGov ? 'badge-중앙정부' : isGG ? 'badge-경기도' : 'badge-city';
   document.getElementById('modal-badges').innerHTML =
     `<span class="badge badge-status-${st}">${st}</span>
-     <span class="badge ${isGG?'badge-경기도':'badge-city'}">${isGG?'🌐 경기도 광역':d.시군}</span>
+     <span class="badge ${cityBadge}">${cityLabel}</span>
      <span class="badge badge-field-${FC(d.분야)}">${d.분야||''}</span>`;
   document.getElementById('modal-title').textContent = d.사업명||'';
   document.getElementById('modal-content').textContent = d.주요내용||'-';
