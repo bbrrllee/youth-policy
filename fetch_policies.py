@@ -31,7 +31,8 @@ except ImportError:
     print("⚠️ beautifulsoup4 없음 - 크롤링 일부 스킵")
 
 # ── 상수 ────────────────────────────────────────────────────
-API_KEY  = os.environ.get("API_KEY", "c937731f-99f2-489c-a334-07bbfff0da0d")
+API_KEY      = os.environ.get("API_KEY", "c937731f-99f2-489c-a334-07bbfff0da0d")
+JOBABA_KEY   = os.environ.get("JOBABA_KEY", "231944106408426fa30737e055d48493")
 # 구 API URL이 다운된 경우를 대비해 복수 엔드포인트 시도
 BASE_URLS = [
     "https://www.youthcenter.go.kr/opi/youthPlcyList.do",
@@ -165,6 +166,82 @@ def search_active(policy_name):
                 link = item.findtext("aplctnUrla", "") or item.findtext("rqutUrla", "")
                 return {"link": link, "period": period}
     return None
+
+# ── 경기도 일자리재단 OpenAPI (JobFndtnSportPolocy) ──────────
+DIV_TO_FIELD = {
+    "구직활동 지원": "일자리",
+    "재직 지원":     "일자리",
+    "기업 지원":     "일자리",
+    "생활 지원":     "금융·복지·문화",
+    "주거 지원":     "주거",
+}
+
+def fetch_jobfndtn_api():
+    results = []
+    url = "https://openapi.gg.go.kr/JobFndtnSportPolocy"
+    page = 1
+    total = None
+    while True:
+        try:
+            r = requests.get(url, params={
+                "KEY": JOBABA_KEY, "Type": "json",
+                "pIndex": page, "pSize": 1000,
+            }, timeout=20)
+            data = r.json()
+            body = data.get("JobFndtnSportPolocy", [{}])
+            if len(body) < 2:
+                break
+            if total is None:
+                total = int(body[0].get("list_total_count", 0))
+            rows = body[1].get("row", [])
+            for row in rows:
+                begin = row.get("RECRUT_BEGIN_DE", "")
+                end   = row.get("RECRUT_END_DE", "")
+                if end:
+                    try:
+                        end_dt = datetime.strptime(end, "%Y%m%d")
+                        status = "마감" if end_dt < TODAY else "모집중"
+                    except:
+                        status = "확인필요"
+                elif begin:
+                    status = "모집중"
+                else:
+                    status = "확인필요"
+
+                시기 = ""
+                if begin and end:
+                    시기 = f"{begin[:4]}.{begin[4:6]}.{begin[6:]} ~ {end[:4]}.{end[4:6]}.{end[6:]}"
+                elif begin:
+                    시기 = f"{begin[:4]}.{begin[4:6]}.{begin[6:]} ~"
+
+                div_nm = row.get("DIV_NM") or ""
+                분야 = DIV_TO_FIELD.get(div_nm, "일자리")
+                region = row.get("REGION_NM") or "경기도"
+
+                results.append({
+                    "시군":     region if region != "경기" else "경기도",
+                    "분야":     분야,
+                    "사업명":   row.get("PBLANC_TITLE", ""),
+                    "주요내용": "",
+                    "모집시기": 시기,
+                    "모집상태": status,
+                    "신청방법": "잡아바 온라인 신청",
+                    "운영기관": row.get("INST_NM", ""),
+                    "문의처":   "",
+                    "링크":     row.get("DETAIL_PAGE_URL", ""),
+                    "링크_모집":row.get("DETAIL_PAGE_URL", ""),
+                    "링크_전년도": "",
+                    "출처":     "경기일자리재단API",
+                    "갱신일":   TODAY.strftime("%Y-%m-%d"),
+                })
+            if len(rows) < 1000:
+                break
+            page += 1
+        except Exception as e:
+            print(f"  경기일자리재단 API 오류: {e}")
+            break
+    print(f"  경기일자리재단 API: {len(results)}건 (전체 {total}건)")
+    return results
 
 # ── 잡아바 크롤링 ────────────────────────────────────────────
 def scrape_jobaba():
@@ -491,6 +568,9 @@ def main():
             root = fetch_api_page(page)
             if root: api_items.extend([parse_api_item(i) for i in root.findall(".//youthPolicy")])
         add_new(api_items, "온통청년 API")
+
+    print("\n경기일자리재단 API...")
+    add_new(fetch_jobfndtn_api(), "경기일자리재단API")
 
     print("\n잡아바...")
     add_new(scrape_jobaba(), "잡아바")
