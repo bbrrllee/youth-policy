@@ -545,22 +545,20 @@ function getFiltered() {
   const STATUS_ORDER = {'모집중':0,'확인필요':1,'모집예정':2,'미정':3,'마감':4};
   const FIELD_ORDER  = ['청년정책','창업','일자리','교육·직업훈련','주거','금융·복지·문화','참여·기반'];
   const sort = document.getElementById('sort-select').value;
-  // 모집상태순은 항상 1차 정렬 기준
-  // 경기도 광역 먼저, 그 다음 모집상태순
+  // 지역 우선순위: 중앙정부(0) > 경기도 광역(1) > 시군구(2)
+  const CITY_RANK = (c) => c==='중앙정부' ? 0 : c==='경기도' ? 1 : 2;
   const byStatus = (a,b) => {
     const sd = (STATUS_ORDER[a.모집상태]??3) - (STATUS_ORDER[b.모집상태]??3);
     if (sd !== 0) return sd;
-    // 같은 상태 내에서 경기도 광역 우선
-    if (a.시군==='경기도' && b.시군!=='경기도') return -1;
-    if (b.시군==='경기도' && a.시군!=='경기도') return 1;
-    return 0;
+    // 같은 상태 내에서 중앙정부 → 경기도 → 시군구 순
+    return CITY_RANK(a.시군) - CITY_RANK(b.시군);
   };
   if (sort === 'status') {
     items = [...items].sort(byStatus);
   } else if (sort === 'city') {
     items = [...items].sort((a,b) => {
-      if (a.시군==='경기도' && b.시군!=='경기도') return -1;
-      if (b.시군==='경기도' && a.시군!=='경기도') return 1;
+      const cr = CITY_RANK(a.시군) - CITY_RANK(b.시군);
+      if (cr !== 0) return cr;
       return a.시군.localeCompare(b.시군,'ko') || byStatus(a,b);
     });
   } else {
