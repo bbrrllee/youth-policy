@@ -101,10 +101,28 @@ html { overflow-x: hidden; }
 }
 .form-note { font-size: 11px; color: var(--text3); line-height: 1.5; }
 
+/* ── 상단 탭 (청년정책 / 유관기관 / 청년센터현황) ── */
+.main-tabs {
+  display: flex; gap: 4px; background: var(--white); border-bottom: 1px solid var(--border);
+  padding: 0 20px; position: sticky; top: 49px; z-index: 180; overflow-x: auto;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.main-tabs::-webkit-scrollbar { display: none; }
+.main-tab {
+  padding: 12px 16px; border: none; background: transparent; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 700; color: var(--text2);
+  border-bottom: 2.5px solid transparent; transition: color .15s, border-color .15s;
+  white-space: nowrap;
+}
+.main-tab:hover { color: var(--accent); }
+.main-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
 .filterbar {
   background: var(--white); border-bottom: 1px solid var(--border);
   padding: 12px 20px; display: flex; flex-direction: column; gap: 10px;
-  position: sticky; top: 49px; z-index: 150;
+  position: sticky; top: 90px; z-index: 150;
 }
 /* 모바일에서 헤더 높이 달라지므로 top 조정 */
 @media (max-width: 480px) {
@@ -246,6 +264,22 @@ html { overflow-x: hidden; }
 .empty { text-align: center; padding: 60px 20px; color: var(--text3); }
 .loading { text-align: center; padding: 80px 20px; color: var(--text3); }
 
+/* ── 유관기관 카드 ── */
+.partner-card .card-title { font-size: 13px; }
+
+/* ── 청년센터현황 테이블 ── */
+.table-wrap {
+  overflow-x: auto; background: var(--white); border: 1.5px solid var(--border);
+  border-radius: 12px; -webkit-overflow-scrolling: touch;
+}
+.center-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.center-table th, .center-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.center-table td.wrap { white-space: normal; min-width: 160px; }
+.center-table th { background: var(--bg); font-weight: 700; color: var(--text2); font-size: 11px; }
+.center-table tr:last-child td { border-bottom: none; }
+.center-table tbody tr:hover td { background: var(--accent-light); }
+.center-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #F3F4F6; color: #374151; border: 1px solid #E5E7EB; }
+
 /* ── 필터 토글 버튼 ── */
 .filter-toggle-btn {
   display: none;
@@ -267,6 +301,9 @@ html { overflow-x: hidden; }
   .header-btns { gap: 6px; }
   .header-btn { padding: 5px 10px; font-size: 11px; }
   .header-counts { gap: 10px; font-size: 11px; }
+
+  .main-tabs { position: relative; top: auto; padding: 0 14px; }
+  .main-tab { padding: 10px 12px; font-size: 12px; }
 
   .filterbar { padding: 10px 14px; gap: 8px; top: auto; position: relative; }
   .filter-toggle-btn { display: flex; }
@@ -345,6 +382,14 @@ html { overflow-x: hidden; }
   </div>
 </header>
 
+<nav class="main-tabs">
+  <button class="main-tab active" data-tab="policy" onclick="switchTab('policy')">📋 청년정책</button>
+  <button class="main-tab" data-tab="partners" onclick="switchTab('partners')">🏢 유관기관</button>
+  <button class="main-tab" data-tab="centers" onclick="switchTab('centers')">🏛️ 청년센터현황</button>
+</nav>
+
+<div id="tab-policy" class="tab-panel active">
+
 <div class="filterbar">
   <!-- 검색: 항상 노출 -->
   <div class="filter-row">
@@ -404,6 +449,40 @@ html { overflow-x: hidden; }
   </div>
   <div class="cards" id="cards"><div class="loading">데이터를 불러오는 중...</div></div>
 </main>
+
+</div><!-- /tab-policy -->
+
+<div id="tab-partners" class="tab-panel">
+  <div class="filterbar">
+    <div class="filter-row">
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="partner-search" placeholder="기관명으로 검색..." autocomplete="off">
+      </div>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">지역</span>
+      <select class="city-select" id="partner-city-select" onchange="setPartnerCity(this.value)">
+        <option value="all">전체 지역</option>
+      </select>
+    </div>
+  </div>
+  <main class="main">
+    <div class="result-bar">
+      <div class="result-count" id="partner-result-count"></div>
+    </div>
+    <div class="cards" id="partner-cards"><div class="loading">데이터를 불러오는 중...</div></div>
+  </main>
+</div>
+
+<div id="tab-centers" class="tab-panel">
+  <main class="main">
+    <div class="result-bar">
+      <div class="result-count" id="center-result-count"></div>
+    </div>
+    <div id="center-table-wrap"><div class="loading">데이터를 불러오는 중...</div></div>
+  </main>
+</div>
 
 <!-- 담당자 컨택 팝업 -->
 <div class="popup-overlay" id="popup-contact" onclick="closePopupOutside(event,'contact')">
@@ -513,6 +592,118 @@ fetch('data.json')
   .catch(() => {
     document.getElementById('cards').innerHTML = '<div class="empty"><p>데이터를 불러오지 못했습니다.</p></div>';
   });
+
+// ── 상단 탭 전환 (청년정책 / 유관기관 / 청년센터현황) ──
+function switchTab(id) {
+  document.querySelectorAll('.main-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-'+id));
+  if (id === 'partners') loadPartners();
+  if (id === 'centers') loadCenters();
+}
+
+// ── 유관기관 탭 ──
+let PARTNERS = null;
+const PARTNER_CITY_ORDER = ['중앙/경기도','고양시','파주시','동두천시','양주시','연천군','의정부시','포천시','가평군','구리시','남양주시'];
+let partnerState = { city: 'all', query: '' };
+
+function loadPartners() {
+  if (PARTNERS !== null) return; // 이미 로드됨
+  fetch('partners.json')
+    .then(r => r.json())
+    .then(json => {
+      PARTNERS = json;
+      const sel = document.getElementById('partner-city-select');
+      PARTNER_CITY_ORDER.filter(c => PARTNERS.some(p => p.시군 === c)).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c; opt.textContent = c === '중앙/경기도' ? '🏛️ 중앙/경기도' : c;
+        sel.appendChild(opt);
+      });
+      renderPartners();
+    })
+    .catch(() => {
+      document.getElementById('partner-cards').innerHTML = '<div class="empty"><p>유관기관 데이터를 불러오지 못했습니다.</p></div>';
+    });
+}
+
+function setPartnerCity(city) { partnerState.city = city; renderPartners(); }
+
+function renderPartners() {
+  if (!PARTNERS) return;
+  let items = PARTNERS;
+  if (partnerState.city !== 'all') items = items.filter(p => p.시군 === partnerState.city);
+  if (partnerState.query) {
+    const q = partnerState.query.toLowerCase();
+    items = items.filter(p =>
+      (p.기관명||'').toLowerCase().includes(q) ||
+      (p.구분||'').toLowerCase().includes(q) ||
+      (p.분류||'').toLowerCase().includes(q) ||
+      (p.비고||'').toLowerCase().includes(q)
+    );
+  }
+  items = [...items].sort((a,b) =>
+    (PARTNER_CITY_ORDER.indexOf(a.시군) - PARTNER_CITY_ORDER.indexOf(b.시군)) || a.기관명.localeCompare(b.기관명,'ko')
+  );
+  document.getElementById('partner-result-count').innerHTML = `<strong>${items.length}</strong>개 기관`;
+  if (items.length === 0) {
+    document.getElementById('partner-cards').innerHTML = '<div class="empty"><p>조건에 맞는 기관이 없습니다.</p></div>';
+    return;
+  }
+  const FC = (f) => (f||'').replace(/[ㆍ·]/g,'').replace(/\s/g,'');
+  document.getElementById('partner-cards').innerHTML = items.map(p => {
+    const isCentral = p.시군 === '중앙/경기도';
+    const cityBadge = isCentral ? 'badge-경기도' : 'badge-city';
+    const cityLabel = isCentral ? '🏛️ 중앙/경기도' : p.시군;
+    const contact = [p.담당자, p.전화번호].filter(Boolean).join(' · ');
+    return `<div class="card partner-card">
+      <div class="card-badges">
+        <span class="badge ${cityBadge}">${cityLabel}</span>
+        ${p.구분 ? `<span class="badge badge-field-${FC(p.구분)}">${p.구분}</span>` : ''}
+      </div>
+      <div class="card-title">${p.기관명}</div>
+      ${p.비고 ? `<div class="card-summary">${p.비고}</div>` : ''}
+      <div class="card-footer">
+        <span class="card-org">${contact}</span>
+        ${p.웹주소 ? `<a class="card-link" href="${p.웹주소}" target="_blank">바로가기 →</a>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+document.getElementById('partner-search').addEventListener('input', e => { partnerState.query = e.target.value.trim(); renderPartners(); });
+
+// ── 청년센터현황 탭 ──
+let CENTERS = null;
+function loadCenters() {
+  if (CENTERS !== null) return;
+  fetch('centers.json')
+    .then(r => r.json())
+    .then(json => { CENTERS = json; renderCenters(); })
+    .catch(() => {
+      document.getElementById('center-table-wrap').innerHTML = '<div class="empty"><p>청년센터현황 데이터를 불러오지 못했습니다.</p></div>';
+    });
+}
+
+function renderCenters() {
+  if (!CENTERS) return;
+  document.getElementById('center-result-count').innerHTML = `<strong>${CENTERS.length}</strong>개 시군`;
+  const rows = CENTERS.map(c => `<tr>
+    <td><span class="center-badge">${c.시군}</span></td>
+    <td>${c.권역||'-'}</td>
+    <td class="wrap">${c.청년센터||'-'}</td>
+    <td class="wrap">${(c.운영방식||'-').replace(/\n/g,'<br>')}</td>
+    <td>${c.청년인구수||'-'}</td>
+    <td>${c.청년인구비율 ? c.청년인구비율+'%' : '-'}</td>
+    <td>${c.청년연령기준||'-'}</td>
+    <td class="wrap">${c.청년공간||'-'}</td>
+  </tr>`).join('');
+  document.getElementById('center-table-wrap').innerHTML = `
+    <div class="table-wrap"><table class="center-table">
+      <thead><tr>
+        <th>시군</th><th>권역</th><th>청년센터</th><th>운영방식</th>
+        <th>청년인구</th><th>청년인구비율</th><th>연령기준</th><th>청년공간</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
 
 function buildCityChips() {
   const sigungu = [...new Set(DATA.filter(d=>d.시군!=='경기도'&&d.시군!=='중앙정부').map(d=>d.시군))].sort((a,b)=>a.localeCompare(b,'ko'));
