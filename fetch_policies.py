@@ -33,6 +33,7 @@ except ImportError:
 # ── 상수 ────────────────────────────────────────────────────
 API_KEY      = os.environ.get("API_KEY", "c937731f-99f2-489c-a334-07bbfff0da0d")
 JOBABA_KEY   = os.environ.get("JOBABA_KEY", "231944106408426fa30737e055d48493")
+YOUTH_API_URL = "https://www.youthcenter.go.kr/go/ythip/getPlcy"
 # 구 API URL이 다운된 경우를 대비해 복수 엔드포인트 시도
 BASE_URLS = [
     "https://www.youthcenter.go.kr/opi/youthPlcyList.do",
@@ -46,9 +47,19 @@ HEADERS  = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit
 FIELD_MAP = {
     "023010": "일자리",
     "023020": "주거",
-    "023030": "교육ㆍ직업훈련",
-    "023040": "금융ㆍ복지ㆍ문화",
-    "023050": "참여권리",
+    "023030": "교육·직업훈련",
+    "023040": "금융·복지·문화",
+    "023050": "참여·기반",
+}
+
+# 온통청년 API 대분류 → 분야 매핑
+LCLSF_MAP = {
+    "일자리": "일자리",
+    "주거":   "주거",
+    "교육":   "교육·직업훈련",
+    "복지문화": "금융·복지·문화",
+    "참여권리": "참여·기반",
+    "창업":   "창업",
 }
 
 GYEONGGI_CITIES = [
@@ -102,48 +113,70 @@ def get_status(text):
 
     return "미정"
 
-# ── 온통청년 API ─────────────────────────────────────────────
+# ── 온통청년 API (신규 엔드포인트) ──────────────────────────
+# 경기도 우편번호 앞자리 (10000~18999)
+def _is_gyeonggi(zip_str):
+    if not zip_str:
+        return False
+    for z in zip_str.split(","):
+        z = z.strip()
+        if z.isdigit() and 10000 <= int(z) <= 18999:
+            return True
+    return False
+
 def fetch_api_page(page=1, per_page=100, keyword=""):
     params = {
-        "openApiVlak": API_KEY,
+        "apiKeyNm":  API_KEY,
         "pageIndex": page,
-        "display": per_page,
-        "srchCtpvCd": "41",
+        "display":   per_page,
     }
     if keyword:
-        params["query"] = keyword
-    for url in BASE_URLS:
-        try:
-            r = requests.get(url, params=params, timeout=20, allow_redirects=False)
-            if r.status_code in (301, 302, 303):
-                print(f"  API 리다이렉트 ({r.status_code}): {url} → 다음 엔드포인트 시도")
-                continue
-            r.encoding = "utf-8"
-            root = ET.fromstring(r.text)
-            if root.find(".//youthPolicy") is not None or root.findtext(".//totalCount"):
-                return root
-        except Exception as e:
-            print(f"  API 오류 ({url}): {e}")
-    print("  ⚠️ 모든 API 엔드포인트 실패")
+        params["plcyNm"] = keyword
+    try:
+        r = requests.get(YOUTH_API_URL, params=params, timeout=30)
+        r.encoding = "utf-8"
+        data = r.json()
+        if data.get("resultCode") == 200:
+            return data.get("result", {})
+    except Exception as e:
+        print(f"  온통청년 API 오류: {e}")
     return None
 
+def _format_date(ymd):
+    ymd = (ymd or "").strip()
+    if len(ymd) == 8:
+        return f"{ymd[:4]}.{ymd[4:6]}.{ymd[6:]}"
+    return ymd
+
 def parse_api_item(item):
-    ssg = item.findtext("ssgNm", "")
-    ssg = ssg.replace("경기도", "").strip() if "경기도" in ssg else ssg
-    field_code = item.findtext("polyBizSecd", "")
-    시기 = item.findtext("rqutPrdCn", "")
+    lclsf = item.get("lclsfNm", "")
+    분야 = LCLSF_MAP.get(lclsf, "청년정책")
+
+    bgng = item.get("bizPrdBgngYmd", "").strip()
+    end  = item.get("bizPrdEndYmd", "").strip()
+    if bgng and end:
+        시기 = f"{_format_date(bgng)} ~ {_format_date(end)}"
+    elif bgng:
+        시기 = f"{_format_date(bgng)} ~"
+    else:
+        시기 = item.get("bizPrdEtcCn", "")
+
+    기관 = item.get("sprvsnInstCdNm", "") or item.get("operInstCdNm", "")
+    zip_str = item.get("zipCd", "")
+    시군 = "경기도" if _is_gyeonggi(zip_str) else "중앙정부"
+
     return {
-        "시군":     ssg or "경기도",
-        "분야":     FIELD_MAP.get(field_code, item.findtext("polyBizSecdNm", "기타")),
-        "사업명":   item.findtext("polyBizSjnm", ""),
-        "주요내용": item.findtext("polyItcnCn", ""),
+        "시군":     시군,
+        "분야":     분야,
+        "사업명":   item.get("plcyNm", ""),
+        "주요내용": (item.get("plcyExplnCn", "") or item.get("plcySprtCn", ""))[:500],
         "모집시기": 시기,
         "모집상태": get_status(시기),
-        "신청방법": item.findtext("rqutUrla", ""),
-        "운영기관": item.findtext("cnsgNmor", ""),
-        "문의처":   item.findtext("inqisCn", ""),
-        "링크":     item.findtext("aplctnUrla", ""),
-        "링크_모집":   item.findtext("aplctnUrla", ""),
+        "신청방법": item.get("plcyAplyMthdCn", ""),
+        "운영기관": 기관,
+        "문의처":   item.get("inqCn", ""),
+        "링크":     item.get("aplyUrlAddr", "") or item.get("refUrlAddr1", ""),
+        "링크_모집":   item.get("aplyUrlAddr", ""),
         "링크_전년도": "",
         "출처":     "온통청년API",
         "갱신일":   TODAY.strftime("%Y-%m-%d"),
@@ -154,17 +187,19 @@ def search_active(policy_name):
     keyword = re.sub(r'[^\w]', ' ', policy_name.replace("경기", "").replace("청년", "")).strip()
     if len(keyword) < 2:
         keyword = policy_name
-    root = fetch_api_page(keyword=keyword)
-    if root is None:
+    result = fetch_api_page(keyword=keyword, per_page=10)
+    if result is None:
         return None
-    for item in root.findall(".//youthPolicy"):
-        name = item.findtext("polyBizSjnm", "")
+    for item in result.get("youthPolicyList", []):
+        name = item.get("plcyNm", "")
         core = [w for w in keyword.split() if len(w) >= 2]
         if any(w in name for w in core):
-            period = item.findtext("rqutPrdCn", "")
-            if get_status(period) == "모집중":
-                link = item.findtext("aplctnUrla", "") or item.findtext("rqutUrla", "")
-                return {"link": link, "period": period}
+            bgng = item.get("bizPrdBgngYmd", "").strip()
+            end  = item.get("bizPrdEndYmd", "").strip()
+            시기 = f"{_format_date(bgng)} ~ {_format_date(end)}" if bgng and end else ""
+            if get_status(시기) == "모집중":
+                link = item.get("aplyUrlAddr", "") or item.get("refUrlAddr1", "")
+                return {"link": link, "period": 시기}
     return None
 
 # ── 경기도 일자리재단 OpenAPI (JobFndtnSportPolocy) ──────────
@@ -560,13 +595,16 @@ def main():
 
     # 각 소스 수집
     print("\n온통청년 API...")
-    first = fetch_api_page(1)
+    first = fetch_api_page(1, per_page=100)
     if first is not None:
-        total = int(first.findtext(".//totalCount","0") or 0)
-        api_items = [parse_api_item(i) for i in first.findall(".//youthPolicy")]
+        total = int(first.get("pagging", {}).get("totCount", 0))
+        api_items = [parse_api_item(i) for i in first.get("youthPolicyList", [])]
         for page in range(2, math.ceil(total/100)+1):
-            root = fetch_api_page(page)
-            if root: api_items.extend([parse_api_item(i) for i in root.findall(".//youthPolicy")])
+            result = fetch_api_page(page, per_page=100)
+            if result:
+                api_items.extend([parse_api_item(i) for i in result.get("youthPolicyList", [])])
+        gg_cnt = sum(1 for i in api_items if i["시군"]=="경기도")
+        print(f"  온통청년 API: 전체 {total}건 중 경기도 {gg_cnt}건")
         add_new(api_items, "온통청년 API")
 
     print("\n경기일자리재단 API...")
