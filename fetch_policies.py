@@ -12,6 +12,7 @@
 """
 
 # ── 전체 import (최상단에 모아서) ──────────────────────────
+import sys
 import os
 import json
 import re
@@ -23,6 +24,11 @@ from datetime import datetime
 from collections import Counter
 
 import requests
+
+# Windows 콘솔의 cp949 기본 인코딩에서도 이모지/한글 출력이 깨지지 않도록 강제 UTF-8
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 try:
     from bs4 import BeautifulSoup
     BS4_OK = True
@@ -100,6 +106,14 @@ def get_status(text):
         if CUR_M > em:  return "마감"
         if CUR_M < sm:  return "모집예정"
         return "확인필요"
+
+    # 종료일 없이 "YYYY년 M월 ~" 형태로 끝나는 경우 (상시/현재진행 시작일)
+    m = re.search(r'(\d{4})년\s*(\d{1,2})월\s*~\s*$', t)
+    if m:
+        try:
+            start = datetime(int(m.group(1)), int(m.group(2)), 1)
+            return "모집예정" if start > TODAY else "모집중"
+        except: pass
 
     if '상반기' in t: return "확인필요"
     if '하반기' in t: return "모집예정"
@@ -334,12 +348,17 @@ def _make_gyeonggi_item(p):
         "출처":"잡아바","갱신일":TODAY.strftime("%Y-%m-%d"),
     }
 
-# ── 경기복지포털 ─────────────────────────────────────────────
+# ── 경기복지포털 (경기민원24) ──────────────────────────────────
+# gg24.gg.go.kr은 최초 접속 시 "가상 대기실" 안내 페이지를 내려주는데,
+# 브라우저에서는 JS가 wcCookie를 세팅해 통과시킨다. 서버는 이 쿠키의
+# 값 자체를 검증하지 않고 존재 여부만 확인하므로 임의 값으로 충분하다.
+GG24_STATUS_MAP = {"접수중": "모집중", "접수예정": "모집예정", "접수마감": "마감"}
+
 def scrape_gg24():
     results = []
     FIXED = [
         {"사업명":"경기 고립은둔청년 지원사업","분야":"금융ㆍ복지ㆍ문화",
-         "url":"https://gg24.gg.go.kr/svcreqst/selectSvcReqst.do?sch_tab_code=10&svc_seq=945",
+         "url":"https://gg24.gg.go.kr/svcreqst/selectSvcReqst.do?svc_seq=945",
          "모집상태":"모집중","문의처":"031-267-9100"},
     ]
     if not BS4_OK:
@@ -348,72 +367,160 @@ def scrape_gg24():
         return results
 
     try:
-        url = "https://gg24.gg.go.kr/svcreqst/selectSvcReqstList.do?sch_tab_code=10"
-        r = requests.get(url, headers=HEADERS, timeout=15)
+        s = requests.Session()
+        s.headers.update(HEADERS)
+        s.cookies.set("wcCookie", "bypass", domain="gg24.gg.go.kr")
+        url = "https://gg24.gg.go.kr/svcreqst/selectPageListSvcReqst.do"
+        r = s.post(url, data={"contentLimit": "300", "type": "", "currentPage": "1"}, timeout=20)
+        r.encoding = "utf-8"
         soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select("li.item, .svc-item, .list-item"):
-            title_el = item.select_one(".svc-nm, .tit, h3, a")
-            if not title_el: continue
-            name = title_el.get_text(strip=True)
+
+        seen_links = set()
+        for li in soup.select("li.board-boxlist__item"):
+            a = li.select_one("a.board-boxlist__link")
+            if not a or not a.get("href"): continue
+            href = a["href"]
+            link = href if href.startswith("http") else f"https://gg24.gg.go.kr{href}"
+            if link in seen_links: continue
+
+            title_el  = li.select_one("h4.board-boxlist--bottom__tit")
+            badge_el  = li.select_one("div.board-boxlist--top__badge")
+            period_el = li.select_one("p.board-boxlist--bottom__sub")
+            name = title_el.get_text(strip=True) if title_el else ""
             if not name or "청년" not in name: continue
-            link_el = item.select_one("a")
-            link = ""
-            if link_el and link_el.get("href"):
-                href = link_el["href"]
-                link = href if href.startswith("http") else f"https://gg24.gg.go.kr{href}"
+            seen_links.add(link)
+
+            badge  = badge_el.get_text(strip=True) if badge_el else ""
+            period = period_el.get_text(strip=True) if period_el else ""
+            status = GG24_STATUS_MAP.get(badge) or get_status(period)
+
             results.append({
                 "시군":"경기도","분야":"금융ㆍ복지ㆍ문화","사업명":name,
-                "주요내용":"","모집시기":"","모집상태":"확인필요",
-                "신청방법":"경기복지포털 온라인 신청","운영기관":"경기복지재단",
-                "문의처":"031-267-9100","링크":link,"링크_모집":link,"링크_전년도":"",
+                "주요내용":"","모집시기":period,"모집상태":status,
+                "신청방법":"경기민원24 온라인 신청","운영기관":"경기도",
+                "문의처":"","링크":link,"링크_모집":link,"링크_전년도":"",
                 "출처":"경기복지포털","갱신일":TODAY.strftime("%Y-%m-%d"),
             })
     except Exception as e:
         print(f"  경기복지포털 오류: {e}")
 
     for p in FIXED:
-        if not any(r["사업명"] == p["사업명"] for r in results):
+        core = p["사업명"].replace("지원사업","").replace("지원","").strip()
+        if not any(core in r["사업명"] for r in results):
             results.append({
                 "시군":"경기도","분야":p["분야"],"사업명":p["사업명"],
                 "주요내용":"","모집시기":"","모집상태":p["모집상태"],
-                "신청방법":"경기복지포털 온라인 신청","운영기관":"경기복지재단",
+                "신청방법":"경기민원24 온라인 신청","운영기관":"경기복지재단",
                 "문의처":p["문의처"],"링크":p["url"],"링크_모집":p["url"],"링크_전년도":"",
                 "출처":"경기복지포털","갱신일":TODAY.strftime("%Y-%m-%d"),
             })
     return results
 
 # ── 경기청년포털 ─────────────────────────────────────────────
-def scrape_gyeonggi_youth():
+# 2025년 개편된 게시판 구조: 5개 분야별 게시판을 offset=10 단위로 페이징.
+# 목록에는 제목만 있고, 신청기간/링크/문의처는 상세(mode=view) 페이지에만
+# 있어서 신규 글만 골라 상세 페이지를 추가로 요청한다.
+GG_YOUTH_BOARDS = [
+    ("https://youth.gg.go.kr/gg/intro/youth-policy-job-test.do", "일자리"),
+    ("https://youth.gg.go.kr/gg/intro/youth-policy-educational-testing.do", "주거"),
+    ("https://youth.gg.go.kr/gg/intro/youth-policy-housing-test.do", "금융·복지·문화"),
+    ("https://youth.gg.go.kr/gg/intro/youth-policy-culture-test.do", "교육·직업훈련"),
+    ("https://youth.gg.go.kr/gg/intro/youth-policy-law-test.do", "참여·기반"),
+]
+GG_YOUTH_MAX_OFFSET = 100  # 분야당 최대 10페이지(약 100건)까지만 순회
+
+def _parse_gg_youth_detail(base_url, article_no):
+    detail_url = f"{base_url}?mode=view&articleNo={article_no}&article.offset=0&articleLimit=10"
+    r = requests.get(detail_url, headers=HEADERS, timeout=15)
+    r.encoding = "utf-8"
+    soup = BeautifulSoup(r.text, "html.parser")
+    body = soup.select_one(".fr-view")
+    if not body:
+        return None
+
+    intro = " ".join(p.get_text(strip=True) for p in body.select(".youth_polish_txt"))
+
+    fields = {}
+    for li in body.select(".content_sums li"):
+        span = li.select_one("span")
+        if not span: continue
+        key = span.get_text(strip=True).rstrip(":：").strip()
+        val = li.get_text(strip=True)
+        val = val[len(span.get_text(strip=True)):].strip()
+        fields[key] = val
+
+    시기 = ""
+    for k, v in fields.items():
+        if "기간" in k or "일정" in k:
+            시기 = v
+            break
+
+    문의 = ""
+    call_el = None
+    for h in body.select("h2.youth_polish_contents_call"):
+        if "문의" in h.get_text():
+            call_el = h.find_next("ul")
+            break
+    if call_el:
+        문의 = call_el.get_text(strip=True).split(":",1)[-1].strip()
+
+    link_el = body.select_one("a.youth_polish_check_btn")
+    link = link_el.get("href","") if link_el else ""
+
+    return {"주요내용": intro[:500], "모집시기": 시기, "문의처": 문의, "링크": link}
+
+def scrape_gyeonggi_youth(existing_data):
     results = []
     if not BS4_OK:
         return results
-    urls = [
-        "https://youth.gg.go.kr/gg/intro/youth-policy-list.do",
-        "https://youth.gg.go.kr/gg/archive-policy-search.do?mode=list&srSido=gyeonggi",
-    ]
-    for url in urls:
-        try:
-            r = requests.get(url, headers=HEADERS, timeout=15)
-            soup = BeautifulSoup(r.text, "html.parser")
-            for item in soup.select(".policy-item, .list-item, article, .card"):
-                title_el = item.select_one("h3, h4, .title, .tit, strong")
-                link_el  = item.select_one("a")
-                if not title_el: continue
-                name = title_el.get_text(strip=True)
-                if not name: continue
-                link = ""
-                if link_el and link_el.get("href"):
-                    href = link_el["href"]
-                    link = href if href.startswith("http") else f"https://youth.gg.go.kr{href}"
-                results.append({
-                    "시군":"경기도","분야":"기타","사업명":name,
-                    "주요내용":"","모집시기":"","모집상태":"확인필요",
-                    "신청방법":"","운영기관":"경기도",
-                    "문의처":"","링크":link,"링크_모집":link,"링크_전년도":"",
-                    "출처":"경기청년포털","갱신일":TODAY.strftime("%Y-%m-%d"),
-                })
-        except Exception as e:
-            print(f"  경기청년포털 오류: {e}")
+
+    existing_links = {d.get("링크","") for d in existing_data if d.get("링크")}
+
+    for base_url, 분야 in GG_YOUTH_BOARDS:
+        offset = 0
+        while offset <= GG_YOUTH_MAX_OFFSET:
+            try:
+                r = requests.get(base_url, params={
+                    "mode": "list", "article.offset": offset, "articleLimit": 10,
+                }, headers=HEADERS, timeout=15)
+                r.encoding = "utf-8"
+                soup = BeautifulSoup(r.text, "html.parser")
+                links = soup.select("td.t-tit a[href*='mode=view']")
+                if not links:
+                    break
+
+                for a in links:
+                    name = a.get_text(strip=True)
+                    m = re.search(r'articleNo=(\d+)', a.get("href",""))
+                    if not name or not m: continue
+                    article_no = m.group(1)
+                    list_link = f"{base_url}?mode=view&articleNo={article_no}"
+                    if list_link in existing_links: continue
+
+                    try:
+                        detail = _parse_gg_youth_detail(base_url, article_no)
+                    except Exception as e:
+                        print(f"  경기청년포털 상세 오류({article_no}): {e}")
+                        detail = None
+                    if not detail: continue
+
+                    link = detail["링크"] or list_link
+                    results.append({
+                        "시군":"경기도","분야":분야,"사업명":name,
+                        "주요내용":detail["주요내용"],"모집시기":detail["모집시기"],
+                        "모집상태":get_status(detail["모집시기"]),
+                        "신청방법":"","운영기관":"경기도",
+                        "문의처":detail["문의처"],"링크":link,"링크_모집":link,"링크_전년도":"",
+                        "출처":"경기청년포털","갱신일":TODAY.strftime("%Y-%m-%d"),
+                    })
+                    existing_links.add(list_link)
+                    time.sleep(0.2)
+
+                offset += 10
+            except Exception as e:
+                print(f"  경기청년포털 오류({분야}): {e}")
+                break
+
     return results
 
 # ── 31개 시군 공고게시판 ──────────────────────────────────────
@@ -423,7 +530,7 @@ def scrape_sigungu(existing_data):
         return []
 
     try:
-        with open("sites.json", "r", encoding="utf-8") as f:
+        with open("sites.json", "r", encoding="utf-8-sig") as f:
             sites = json.load(f)
     except Exception as e:
         print(f"  sites.json 읽기 오류: {e}")
@@ -617,7 +724,7 @@ def main():
     add_new(scrape_gg24(), "경기복지포털")
 
     print("\n경기청년포털...")
-    add_new(scrape_gyeonggi_youth(), "경기청년포털")
+    add_new(scrape_gyeonggi_youth(updated), "경기청년포털")
 
     print("\n31개 시군 게시판...")
     sigungu_new = scrape_sigungu(updated)
