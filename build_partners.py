@@ -78,6 +78,21 @@ def build_partners():
         print(f'  {tab}: {sum(1 for p in partners if p["시군"]==시군)}건')
     return partners
 
+# 청년센터현황 시트에는 링크 컬럼이 없어서 직접 조사한 값을 수동으로 관리.
+# (build_partners.py를 다시 돌려도 유지되도록 시트 데이터가 아니라 코드에 둠)
+CENTER_LINKS = {
+    '고양시':   'https://goyangjobcafe.kr/',
+    '파주시':   'https://www.paju.go.kr/youth/index.do',
+    '동두천시': 'https://www.ddcstartup.co.kr/',
+    '양주시':   'https://www.yangju.go.kr/youth/index.do',
+    '연천군':   'https://www.yeoncheon.go.kr/',
+    '의정부시': 'https://www.uiyouth.or.kr/',
+    '포천시':   'https://www.pocheon.go.kr/youth/index.do',
+    '가평군':   'https://www.gp.go.kr/',
+    '구리시':   'https://guristartup.or.kr/',
+    '남양주시': 'https://www.nyj.go.kr/',
+}
+
 def build_centers():
     rows = fetch_gid_csv(CENTER_GID)
     hdr_idx = None
@@ -105,6 +120,7 @@ def build_centers():
             '청년인구비율': get(6),
             '청년연령기준': get(7),
             '청년공간': get(8),
+            '링크': CENTER_LINKS.get(시군, ''),
         })
     return centers
 

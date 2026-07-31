@@ -24,6 +24,8 @@ from datetime import datetime
 from collections import Counter
 
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Windows 콘솔의 cp949 기본 인코딩에서도 이모지/한글 출력이 깨지지 않도록 강제 UTF-8
 if hasattr(sys.stdout, "reconfigure"):
@@ -138,6 +140,18 @@ def _is_gyeonggi(zip_str):
             return True
     return False
 
+# 다른 시도 소관 정책이 경기도 우편번호 대역과 우연히 겹쳐 "경기도"로
+# 오분류되는 경우 방지 (예: 전남광주통합특별시 zipCd가 12xxx로 잡히는 사례)
+_NON_GG_REGION_KW = ['서울','부산','대구','인천','대전','울산','세종',
+                     '강원','충북','충청북도','충남','충청남도',
+                     '전북','전라북도','전남','전라남도',
+                     '경북','경상북도','경남','경상남도','제주']
+
+def _mentions_other_region(name):
+    if not name or '경기' in name:
+        return False
+    return any(kw in name for kw in _NON_GG_REGION_KW)
+
 def fetch_api_page(page=1, per_page=100, keyword=""):
     params = {
         "apiKeyNm":  API_KEY,
@@ -177,7 +191,8 @@ def parse_api_item(item):
 
     기관 = item.get("sprvsnInstCdNm", "") or item.get("operInstCdNm", "")
     zip_str = item.get("zipCd", "")
-    시군 = "경기도" if _is_gyeonggi(zip_str) else "중앙정부"
+    is_gg = _is_gyeonggi(zip_str) and not _mentions_other_region(기관)
+    시군 = "경기도" if is_gg else "중앙정부"
 
     return {
         "시군":     시군,
@@ -545,7 +560,11 @@ def scrape_sigungu(existing_data):
         시군 = site.get("city") or site.get("시군", "")
         url  = site["url"]
         try:
-            r = requests.get(url, headers=HEADERS, timeout=10)
+            try:
+                r = requests.get(url, headers=HEADERS, timeout=10)
+            except requests.exceptions.SSLError:
+                # 일부 시군 사이트가 중간 인증서 체인을 누락해 SSL 검증이 실패함
+                r = requests.get(url, headers=HEADERS, timeout=10, verify=False)
             r.encoding = r.apparent_encoding or "utf-8"
             soup = BeautifulSoup(r.text, "html.parser")
             rows = []
@@ -689,16 +708,46 @@ def main():
 
     existing_names = {d.get("사업명","") for d in updated}
 
+    # 수동으로 넣은 시행계획 데이터는 링크/모집상태 정보가 부실한 경우가 많음.
+    # 같은 정책을 자동수집 소스가 다시 찾아내면(공백 차이 등으로 이름은 살짝
+    # 다를 수 있음) 새로 추가하지 않고 기존 항목을 최신 정보로 갱신한다.
+    MANUAL_SOURCES = {"2026경기시행계획", "2026중앙정부시행계획"}
+    _norm = lambda s: re.sub(r'\s+', '', s or '')
+    existing_by_norm = {}
+    for d in updated:
+        existing_by_norm.setdefault(_norm(d.get("사업명","")), d)
+
+    def _is_weak(d):
+        if d.get("출처") not in MANUAL_SOURCES:
+            return False
+        has_link = bool(d.get("링크_모집") or d.get("링크"))
+        return (not has_link) or d.get("모집상태") in ("미정", "확인필요")
+
     def add_new(items, label):
         added = 0
+        merged = 0
         for item in items:
             name = item.get("사업명","")
-            if name and len(name) > 2 and name not in existing_names:
-                item["모집상태"] = get_status(item.get("모집시기","")) or item.get("모집상태","미정")
-                updated.append(item)
-                existing_names.add(name)
-                added += 1
-        print(f"{label}: {added}개 추가")
+            if not name or len(name) <= 2:
+                continue
+            if name in existing_names:
+                continue
+            norm = _norm(name)
+            weak_match = existing_by_norm.get(norm)
+            if weak_match is not None and _is_weak(weak_match):
+                for f in ["모집시기","모집상태","링크","링크_모집","신청방법","문의처","운영기관"]:
+                    if item.get(f):
+                        weak_match[f] = item[f]
+                weak_match["모집상태"] = get_status(weak_match.get("모집시기","")) or weak_match.get("모집상태","미정")
+                merged += 1
+                continue
+            item["모집상태"] = get_status(item.get("모집시기","")) or item.get("모집상태","미정")
+            updated.append(item)
+            existing_names.add(name)
+            existing_by_norm.setdefault(norm, item)
+            added += 1
+        suffix = f" (+{merged}개 기존 항목 최신화)" if merged else ""
+        print(f"{label}: {added}개 추가{suffix}")
 
     # 각 소스 수집
     print("\n온통청년 API...")

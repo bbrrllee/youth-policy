@@ -685,16 +685,21 @@ function loadCenters() {
 function renderCenters() {
   if (!CENTERS) return;
   document.getElementById('center-result-count').innerHTML = `<strong>${CENTERS.length}</strong>개 시군`;
-  const rows = CENTERS.map(c => `<tr>
+  const rows = CENTERS.map(c => {
+    const centerCell = c.링크
+      ? `<a href="${c.링크}" target="_blank" style="color:var(--accent);font-weight:600;">${c.청년센터||'-'} ↗</a>`
+      : (c.청년센터||'-');
+    return `<tr>
     <td><span class="center-badge">${c.시군}</span></td>
     <td>${c.권역||'-'}</td>
-    <td class="wrap">${c.청년센터||'-'}</td>
+    <td class="wrap">${centerCell}</td>
     <td class="wrap">${(c.운영방식||'-').replace(/\n/g,'<br>')}</td>
     <td>${c.청년인구수||'-'}</td>
     <td>${c.청년인구비율 ? c.청년인구비율+'%' : '-'}</td>
     <td>${c.청년연령기준||'-'}</td>
     <td class="wrap">${c.청년공간||'-'}</td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
   document.getElementById('center-table-wrap').innerHTML = `
     <div class="table-wrap"><table class="center-table">
       <thead><tr>
