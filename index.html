@@ -829,7 +829,8 @@ function openModal(idx) {
     <div class="modal-item"><div class="modal-item-label">📅 모집시기</div><div class="modal-item-value ${sc}">${d.모집시기||'미정'}</div></div>
     <div class="modal-item"><div class="modal-item-label">📝 신청방법</div><div class="modal-item-value">${d.신청방법||'-'}</div></div>
     <div class="modal-item"><div class="modal-item-label">🏢 운영기관</div><div class="modal-item-value">${d.운영기관||'-'}</div></div>
-    <div class="modal-item"><div class="modal-item-label">📞 문의처</div><div class="modal-item-value">${d.문의처||'-'}</div></div>`;
+    <div class="modal-item"><div class="modal-item-label">📞 문의처</div><div class="modal-item-value">${d.문의처||'-'}</div></div>
+    <div class="modal-item"><div class="modal-item-label">🗂️ 데이터 출처</div><div class="modal-item-value">${d.출처||'-'}${d.갱신일 ? ` (${d.갱신일} 갱신)` : ''}</div></div>`;
   const activeLink = d.링크_모집 || d.링크 || '';
   document.getElementById('btn-link').style.display   = activeLink ? '' : 'none';
   document.getElementById('btn-prev').style.display   = d.링크_전년도 ? '' : 'none';

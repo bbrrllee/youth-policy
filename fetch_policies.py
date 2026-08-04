@@ -586,7 +586,10 @@ def scrape_sigungu(existing_data):
                 if any(title[:8] in name for name in existing_names if len(name) > 4):
                     for d in existing_data:
                         if d.get("시군")==시군 and title[:8] in d.get("사업명",""):
-                            if d.get("모집상태") != "모집중":
+                            # 이미 명확히 "마감"으로 확인된 정책은 게시판 제목이
+                            # 우연히 겹친다고 되살리지 않는다 (원문에 "모집종료" 등이
+                            # 있는데도 모집중으로 덮어써지는 오류 방지)
+                            if d.get("모집상태") not in ("모집중", "마감"):
                                 d["모집상태"] = "모집중"
                                 d["링크_모집"] = full_link
                     continue
