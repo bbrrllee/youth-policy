@@ -152,6 +152,14 @@ def _mentions_other_region(name):
         return False
     return any(kw in name for kw in _NON_GG_REGION_KW)
 
+# "중앙정부" 배지는 전국 어디서나 신청 가능한 진짜 중앙부처 정책에만 붙인다.
+# 온통청년 API는 경기도가 아니면 전부 "중앙정부"로 뭉뚱그려 놨는데, 실제로는
+# 그 안에 다른 시/도의 지역 한정 정책이 대부분 섞여 있어 경기 청년에게는
+# 의미가 없다. 운영기관명이나 사업명에 다른 지역명이 있으면 특정 지역 한정
+# 정책으로 보고 아예 목록에서 제외한다.
+def _is_other_region_local_policy(기관, 사업명):
+    return _mentions_other_region(기관) or _mentions_other_region(사업명)
+
 def fetch_api_page(page=1, per_page=100, keyword=""):
     params = {
         "apiKeyNm":  API_KEY,
@@ -190,9 +198,15 @@ def parse_api_item(item):
         시기 = item.get("bizPrdEtcCn", "")
 
     기관 = item.get("sprvsnInstCdNm", "") or item.get("operInstCdNm", "")
+    사업명 = item.get("plcyNm", "")
     zip_str = item.get("zipCd", "")
-    is_gg = _is_gyeonggi(zip_str) and not _mentions_other_region(기관)
-    시군 = "경기도" if is_gg else "중앙정부"
+
+    if _is_gyeonggi(zip_str) and not _is_other_region_local_policy(기관, 사업명):
+        시군 = "경기도"
+    elif _is_other_region_local_policy(기관, 사업명):
+        return None  # 경기도 청년과 무관한 타 지역 한정 정책 제외
+    else:
+        시군 = "중앙정부"
 
     return {
         "시군":     시군,
@@ -583,15 +597,10 @@ def scrape_sigungu(existing_data):
                              else f"https://{url.split('/')[2]}{href}" if href.startswith("/")
                              else url)
                 if full_link in existing_links: continue
+                # 제목이 기존 항목과 겹치면 중복 추가만 막는다. 게시판 제목이
+                # 우연히 겹친다고 모집상태를 함부로 "모집중"으로 덮어쓰지 않는다
+                # (실제 모집시기/본문과 무관하게 상태가 틀어지는 오류가 반복 발생함).
                 if any(title[:8] in name for name in existing_names if len(name) > 4):
-                    for d in existing_data:
-                        if d.get("시군")==시군 and title[:8] in d.get("사업명",""):
-                            # 이미 명확히 "마감"으로 확인된 정책은 게시판 제목이
-                            # 우연히 겹친다고 되살리지 않는다 (원문에 "모집종료" 등이
-                            # 있는데도 모집중으로 덮어써지는 오류 방지)
-                            if d.get("모집상태") not in ("모집중", "마감"):
-                                d["모집상태"] = "모집중"
-                                d["링크_모집"] = full_link
                     continue
                 results.append({
                     "시군":시군,"분야":"기타","사업명":title,
@@ -711,20 +720,16 @@ def main():
 
     existing_names = {d.get("사업명","") for d in updated}
 
-    # 수동으로 넣은 시행계획 데이터는 링크/모집상태 정보가 부실한 경우가 많음.
-    # 같은 정책을 자동수집 소스가 다시 찾아내면(공백 차이 등으로 이름은 살짝
-    # 다를 수 있음) 새로 추가하지 않고 기존 항목을 최신 정보로 갱신한다.
-    MANUAL_SOURCES = {"2026경기시행계획", "2026중앙정부시행계획"}
+    # 같은 정책이 수동 입력본과 자동수집본에 공백 차이 등으로 이름이 살짝
+    # 다르게 들어오는 경우가 많다. "청년정책위원회 운영"처럼 여러 시군이
+    # 각자 운영하는 동명의 사업도 있으므로, 이름 정규화만으로는 다른 시군의
+    # 별개 사업을 하나로 합쳐버릴 수 있다 → (정규화한 이름, 시군)이 모두
+    # 같을 때만 같은 정책으로 보고, 새로 추가하지 않고 기존 항목을 최신
+    # 정보로 갱신한다.
     _norm = lambda s: re.sub(r'\s+', '', s or '')
-    existing_by_norm = {}
+    existing_by_key = {}
     for d in updated:
-        existing_by_norm.setdefault(_norm(d.get("사업명","")), d)
-
-    def _is_weak(d):
-        if d.get("출처") not in MANUAL_SOURCES:
-            return False
-        has_link = bool(d.get("링크_모집") or d.get("링크"))
-        return (not has_link) or d.get("모집상태") in ("미정", "확인필요")
+        existing_by_key.setdefault((_norm(d.get("사업명","")), d.get("시군","")), d)
 
     def add_new(items, label):
         added = 0
@@ -735,19 +740,19 @@ def main():
                 continue
             if name in existing_names:
                 continue
-            norm = _norm(name)
-            weak_match = existing_by_norm.get(norm)
-            if weak_match is not None and _is_weak(weak_match):
+            key = (_norm(name), item.get("시군",""))
+            match = existing_by_key.get(key)
+            if match is not None:
                 for f in ["모집시기","모집상태","링크","링크_모집","신청방법","문의처","운영기관"]:
                     if item.get(f):
-                        weak_match[f] = item[f]
-                weak_match["모집상태"] = get_status(weak_match.get("모집시기","")) or weak_match.get("모집상태","미정")
+                        match[f] = item[f]
+                match["모집상태"] = get_status(match.get("모집시기","")) or match.get("모집상태","미정")
                 merged += 1
                 continue
             item["모집상태"] = get_status(item.get("모집시기","")) or item.get("모집상태","미정")
             updated.append(item)
             existing_names.add(name)
-            existing_by_norm.setdefault(norm, item)
+            existing_by_key.setdefault(key, item)
             added += 1
         suffix = f" (+{merged}개 기존 항목 최신화)" if merged else ""
         print(f"{label}: {added}개 추가{suffix}")
@@ -762,8 +767,9 @@ def main():
             result = fetch_api_page(page, per_page=100)
             if result:
                 api_items.extend([parse_api_item(i) for i in result.get("youthPolicyList", [])])
+        api_items = [i for i in api_items if i is not None]
         gg_cnt = sum(1 for i in api_items if i["시군"]=="경기도")
-        print(f"  온통청년 API: 전체 {total}건 중 경기도 {gg_cnt}건")
+        print(f"  온통청년 API: 전체 {total}건 중 경기도 {gg_cnt}건 (경기 외 지역 한정 정책 제외)")
         add_new(api_items, "온통청년 API")
 
     print("\n경기일자리재단 API...")
