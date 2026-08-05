@@ -254,6 +254,27 @@ DIV_TO_FIELD = {
     "주거 지원":     "주거",
 }
 
+_GYEONGGI_GUN = {"가평", "연천", "양평"}
+def _with_city_suffix(city):
+    return city + ("군" if city in _GYEONGGI_GUN else "시")
+
+# 이 API의 REGION_NM 필드는 거의 항상 "그외 지역"으로 채워져 있어 쓸모가
+# 없다. 대신 공고 제목의 "[oo시]" 접두어나 담당기관명("oo시청" 등)에서
+# 실제 시군을 뽑아낸다.
+def _extract_gg_city(title, inst_nm, region_nm):
+    m = re.match(r'\s*\[([^\]]+)\]', title or '')
+    if m:
+        bracket = m.group(1)
+        for city in GYEONGGI_CITIES:
+            if city != "경기" and city in bracket:
+                return _with_city_suffix(city)
+    for city in GYEONGGI_CITIES:
+        if city != "경기" and city in (inst_nm or ''):
+            return _with_city_suffix(city)
+    if region_nm and region_nm not in ("그외 지역", "경기"):
+        return region_nm
+    return "경기도"
+
 def fetch_jobfndtn_api():
     results = []
     url = "https://openapi.gg.go.kr/JobFndtnSportPolocy"
@@ -294,12 +315,13 @@ def fetch_jobfndtn_api():
 
                 div_nm = row.get("DIV_NM") or ""
                 분야 = DIV_TO_FIELD.get(div_nm, "일자리")
-                region = row.get("REGION_NM") or "경기도"
+                title = row.get("PBLANC_TITLE", "")
+                region = _extract_gg_city(title, row.get("INST_NM",""), row.get("REGION_NM",""))
 
                 results.append({
-                    "시군":     region if region != "경기" else "경기도",
+                    "시군":     region,
                     "분야":     분야,
-                    "사업명":   row.get("PBLANC_TITLE", ""),
+                    "사업명":   title,
                     "주요내용": "",
                     "모집시기": 시기,
                     "모집상태": status,
