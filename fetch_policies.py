@@ -95,6 +95,17 @@ def get_status(text):
             if end < TODAY: return "마감"
         except: pass
 
+    # 종료일에 연도가 생략된 경우 (예: "2026.2. 23. ~ 3. 13." → 종료일 연도는
+    # 시작일과 동일한 것으로 간주). 이걸 놓치면 종료일이 지난 사업도 시작일
+    # 기준으로만 판단해 계속 "모집중"으로 남는 버그가 생긴다.
+    m = re.search(r'(\d{4})[.\s]+(\d{1,2})[.\s]+(\d{1,2})\.?\s*~\s*(\d{1,2})[.\s]+(\d{1,2})\.?', t)
+    if m:
+        try:
+            year = int(m.group(1))
+            end = datetime(year, int(m.group(4)), int(m.group(5)))
+            if end < TODAY: return "마감"
+        except: pass
+
     m = re.search(r'(\d{4})[.\s]*(\d{1,2})[.\s]*(\d{1,2})', t)
     if m:
         try:

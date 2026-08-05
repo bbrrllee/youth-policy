@@ -409,9 +409,9 @@ html { overflow-x: hidden; }
   <div class="filter-rows-wrap collapsed" id="filter-rows-wrap">
     <div class="filter-row">
       <span class="filter-label">상태</span>
-      <div class="chip active" id="chip-all-status" onclick="setAllStatus(this)">전체</div>
+      <div class="chip" id="chip-all-status" onclick="setAllStatus(this)">전체</div>
       <div class="chip status-check" data-status="확인필요" onclick="toggleStatus('확인필요',this)">🔴 확인필요</div>
-      <div class="chip status-ing" data-status="모집중" onclick="toggleStatus('모집중',this)">🟢 모집중</div>
+      <div class="chip status-ing active" data-status="모집중" onclick="toggleStatus('모집중',this)">🟢 모집중</div>
       <div class="chip status-soon" data-status="모집예정" onclick="toggleStatus('모집예정',this)">🟡 모집예정</div>
       <div class="chip status-unknown" data-status="미정" onclick="toggleStatus('미정',this)">⚪ 미정</div>
       <div class="chip status-done" data-status="마감" onclick="toggleStatus('마감',this)">⚫ 마감</div>
@@ -465,6 +465,10 @@ html { overflow-x: hidden; }
       <select class="city-select" id="partner-city-select" onchange="setPartnerCity(this.value)">
         <option value="all">전체 지역</option>
       </select>
+    </div>
+    <div class="filter-row" id="partner-field-row">
+      <span class="filter-label">분야</span>
+      <div class="chip active" data-pfield="all" onclick="setPartnerField('all',this)">전체</div>
     </div>
   </div>
   <main class="main">
@@ -575,7 +579,7 @@ html { overflow-x: hidden; }
 <script>
 let DATA = [];
 const ALL_STATUSES = ['확인필요','모집중','모집예정','미정','마감'];
-let state = { statuses: new Set(ALL_STATUSES), city: 'all', field: 'all', query: '', allStatus: true };
+let state = { statuses: new Set(['모집중']), city: 'all', field: 'all', query: '', allStatus: false };
 let currentItem = null;
 
 fetch('data.json')
@@ -604,7 +608,7 @@ function switchTab(id) {
 // ── 유관기관 탭 ──
 let PARTNERS = null;
 const PARTNER_CITY_ORDER = ['중앙/경기도','고양시','파주시','동두천시','양주시','연천군','의정부시','포천시','가평군','구리시','남양주시'];
-let partnerState = { city: 'all', query: '' };
+let partnerState = { city: 'all', field: 'all', query: '' };
 
 function loadPartners() {
   if (PARTNERS !== null) return; // 이미 로드됨
@@ -618,6 +622,14 @@ function loadPartners() {
         opt.value = c; opt.textContent = c === '중앙/경기도' ? '🏛️ 중앙/경기도' : c;
         sel.appendChild(opt);
       });
+      const fields = [...new Set(PARTNERS.map(p => p.구분).filter(Boolean))];
+      const fieldRow = document.getElementById('partner-field-row');
+      fields.forEach(fld => {
+        const chip = document.createElement('div');
+        chip.className = 'chip'; chip.dataset.pfield = fld; chip.textContent = fld;
+        chip.onclick = () => setPartnerField(fld, chip);
+        fieldRow.appendChild(chip);
+      });
       renderPartners();
     })
     .catch(() => {
@@ -626,11 +638,18 @@ function loadPartners() {
 }
 
 function setPartnerCity(city) { partnerState.city = city; renderPartners(); }
+function setPartnerField(field, el) {
+  partnerState.field = field;
+  document.querySelectorAll('[data-pfield]').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderPartners();
+}
 
 function renderPartners() {
   if (!PARTNERS) return;
   let items = PARTNERS;
   if (partnerState.city !== 'all') items = items.filter(p => p.시군 === partnerState.city);
+  if (partnerState.field !== 'all') items = items.filter(p => p.구분 === partnerState.field);
   if (partnerState.query) {
     const q = partnerState.query.toLowerCase();
     items = items.filter(p =>
@@ -693,7 +712,6 @@ function renderCenters() {
     <td><span class="center-badge">${c.시군}</span></td>
     <td>${c.권역||'-'}</td>
     <td class="wrap">${centerCell}</td>
-    <td class="wrap">${(c.운영방식||'-').replace(/\n/g,'<br>')}</td>
     <td>${c.청년인구수||'-'}</td>
     <td>${c.청년인구비율 ? c.청년인구비율+'%' : '-'}</td>
     <td>${c.청년연령기준||'-'}</td>
@@ -703,7 +721,7 @@ function renderCenters() {
   document.getElementById('center-table-wrap').innerHTML = `
     <div class="table-wrap"><table class="center-table">
       <thead><tr>
-        <th>시군</th><th>권역</th><th>청년센터</th><th>운영방식</th>
+        <th>시군</th><th>권역</th><th>청년센터</th>
         <th>청년인구</th><th>청년인구비율</th><th>연령기준</th><th>청년공간</th>
       </tr></thead>
       <tbody>${rows}</tbody>
